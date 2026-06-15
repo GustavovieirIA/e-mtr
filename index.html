@@ -721,14 +721,16 @@
 
   function showResponse(boxId, data, isError) {
     const box = document.getElementById(boxId);
-    box.className = 'response-box ' + (isError ? 'error' : 'success');
     let text;
     if (typeof data === 'string') {
-      text = data;
+      text = data.trim();
+      if (text.includes('❌')) isError = true;
     } else {
       try { text = JSON.stringify(data, null, 2); } catch { text = String(data); }
     }
-    box.textContent = isError ? '✗ Erro: ' + text : '✓ Sucesso:\n' + text;
+    box.className = 'response-box ' + (isError ? 'error' : 'success');
+    box.textContent = text;
+    setTimeout(() => box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
   }
 
   async function postJSON(url, payload, btnId, respId) {
