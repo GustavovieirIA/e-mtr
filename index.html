@@ -92,6 +92,24 @@
       box-shadow: 0 0 0 3px rgba(26,82,118,.12);
       background: #fff;
     }
+    .cnpj-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cnpj-btn {
+      padding: 7px 13px;
+      border: 1px solid #cbd5e0;
+      border-radius: 5px;
+      background: #f7f9fc;
+      color: #4a5568;
+      font-size: .8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+      line-height: 1.3;
+    }
+    .cnpj-btn:hover { border-color: #1a5276; color: #1a5276; background: #ebf0f7; }
+    .cnpj-btn.active { border-color: #1a5276; background: #1a5276; color: #fff; }
+    .cnpj-btn small { display: block; font-weight: 400; font-size: .72rem; opacity: .8; }
+
     select { cursor: pointer; appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23718096' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
@@ -176,7 +194,21 @@
       <div class="grid">
         <div class="field">
           <label>CNPJ do Gerador</label>
-          <input type="text" id="e-cnpjGerador" placeholder="00000000000000" maxlength="18" />
+          <div class="cnpj-group">
+            <button type="button" class="cnpj-btn" data-cnpj="07711109000186" onclick="selectGerador(this)">
+              07.711.109/0001-86
+              <small>União Recicláveis</small>
+            </button>
+            <button type="button" class="cnpj-btn" data-cnpj="36774850000194" onclick="selectGerador(this)">
+              36.774.850/0001-94
+              <small>LCA</small>
+            </button>
+            <button type="button" class="cnpj-btn" data-cnpj="" onclick="selectGerador(this)">
+              Outro
+              <small>digitável</small>
+            </button>
+          </div>
+          <input type="text" id="e-cnpjGerador" placeholder="00000000000000" maxlength="18" style="display:none;margin-top:8px;" />
         </div>
         <div class="field">
           <label>Código da Unidade do Gerador</label>
@@ -482,6 +514,20 @@
     fillSelect('e-codUnidadeMedida',    UNIDADES);
     fillSelect('b-codTecnologia',       TECNOLOGIAS);
     fillSelect('b-codEstadoFisico',     ESTADOS);
+  }
+
+  function selectGerador(btn) {
+    document.querySelectorAll('.cnpj-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const input = document.getElementById('e-cnpjGerador');
+    if (btn.dataset.cnpj === '') {
+      input.style.display = '';
+      input.value = '';
+      input.focus();
+    } else {
+      input.style.display = 'none';
+      input.value = btn.dataset.cnpj;
+    }
   }
 
   function switchTab(name, el) {
