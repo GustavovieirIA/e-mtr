@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>E-MTR</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a5276;
+      color: #fff;
+      padding: 16px 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    header h1 { font-size: 1.3rem; font-weight: 600; letter-spacing: .5px; }
+    header p  { font-size: .8rem; opacity: .75; margin-top: 2px; }
+
+    .container { max-width: 780px; margin: 32px auto; padding: 0 16px 48px; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: -1px;
+    }
+    .tab-btn {
+      padding: 10px 22px;
+      border: 1px solid #c8d0d8;
+      border-bottom: none;
+      background: #dde3ea;
+      color: #4a5568;
+      font-size: .9rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+      transition: background .15s, color .15s;
+    }
+    .tab-btn:hover { background: #cfd7e0; }
+    .tab-btn.active {
+      background: #fff;
+      color: #1a5276;
+      border-color: #c8d0d8;
+      font-weight: 600;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #c8d0d8;
+      border-radius: 0 6px 6px 6px;
+      padding: 28px 32px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Form */
+    .section-title {
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: #718096;
+      margin: 24px 0 12px;
+      border-bottom: 1px solid #e8ecf0;
+      padding-bottom: 6px;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .full  { grid-column: 1 / -1; }
+
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    label {
+      font-size: .78rem;
+      font-weight: 600;
+      color: #4a5568;
+    }
+    label .opt {
+      font-weight: 400;
+      color: #a0aec0;
+      font-size: .72rem;
+    }
+
+    input, textarea {
+      padding: 8px 11px;
+      border: 1px solid #cbd5e0;
+      border-radius: 5px;
+      font-size: .88rem;
+      color: #1a1a2e;
+      background: #f7f9fc;
+      transition: border-color .15s, box-shadow .15s;
+      width: 100%;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #1a5276;
+      box-shadow: 0 0 0 3px rgba(26,82,118,.12);
+      background: #fff;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    .btn-submit {
+      margin-top: 24px;
+      width: 100%;
+      padding: 12px;
+      background: #1a5276;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-submit:hover:not(:disabled) { background: #154360; }
+    .btn-submit:disabled { opacity: .65; cursor: not-allowed; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    .btn-submit.loading .spinner { display: block; }
+    .btn-submit.loading .btn-text::before { content: 'Enviando…'; }
+    .btn-submit:not(.loading) .btn-text::before { content: attr(data-label); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Response box */
+    .response-box {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-radius: 6px;
+      font-size: .85rem;
+      line-height: 1.5;
+      display: none;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .response-box.success {
+      background: #e6ffed;
+      border: 1px solid #68d391;
+      color: #22543d;
+      display: block;
+    }
+    .response-box.error {
+      background: #fff5f5;
+      border: 1px solid #fc8181;
+      color: #742a2a;
+      display: block;
+    }
+
+    @media (max-width: 560px) {
+      .card { padding: 20px 16px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>E-MTR — Manifesto de Transporte de Resíduos</h1>
+  <p>Sistema Eletrônico de Gerenciamento de Resíduos</p>
+</header>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('emitir', this)">Emitir MTR</button>
+    <button class="tab-btn"        onclick="switchTab('baixa', this)">Dar Baixa no MTR</button>
+  </div>
+
+  <div class="card">
+
+    <!-- ===== TAB 1: Emitir MTR ===== -->
+    <div id="panel-emitir" class="tab-panel active">
+
+      <p class="section-title">Gerador</p>
+      <div class="grid">
+        <div class="field">
+          <label>CNPJ do Gerador</label>
+          <input type="text" id="e-cnpjGerador" placeholder="00.000.000/0000-00" maxlength="18" />
+        </div>
+        <div class="field">
+          <label>Código da Unidade do Gerador</label>
+          <input type="number" id="e-codUnidadeGerador" placeholder="Ex.: 123" />
+        </div>
+      </div>
+
+      <p class="section-title">Transportador <span class="opt">(opcional)</span></p>
+      <div class="grid">
+        <div class="field">
+          <label>CNPJ do Transportador <span class="opt">opcional</span></label>
+          <input type="text" id="e-cnpjTransportador" placeholder="00.000.000/0000-00" maxlength="18" />
+        </div>
+        <div class="field">
+          <label>Código da Unidade do Transportador <span class="opt">opcional</span></label>
+          <input type="number" id="e-codUnidadeTransportador" placeholder="Ex.: 456" />
+        </div>
+      </div>
+
+      <p class="section-title">Responsável</p>
+      <div class="grid">
+        <div class="field">
+          <label>Nome do Responsável</label>
+          <input type="text" id="e-nomeResponsavel" placeholder="Nome completo" />
+        </div>
+        <div class="field">
+          <label>Cargo do Responsável</label>
+          <input type="text" id="e-cargoResponsavel" placeholder="Ex.: Gerente Ambiental" />
+        </div>
+      </div>
+
+      <p class="section-title">Transporte <span class="opt">(opcional)</span></p>
+      <div class="grid">
+        <div class="field">
+          <label>Nome do Motorista <span class="opt">opcional</span></label>
+          <input type="text" id="e-nomeMotorista" placeholder="Nome completo" />
+        </div>
+        <div class="field">
+          <label>Placa do Veículo <span class="opt">opcional</span></label>
+          <input type="text" id="e-placaVeiculo" placeholder="ABC-1234" maxlength="8" />
+        </div>
+        <div class="field">
+          <label>Data de Expedição <span class="opt">opcional — AAAAMMDD</span></label>
+          <input type="text" id="e-dataExpedicao" placeholder="20250615" maxlength="8" />
+        </div>
+      </div>
+
+      <p class="section-title">Resíduo</p>
+      <div class="grid">
+        <div class="field">
+          <label>Código do Resíduo (IBAMA)</label>
+          <input type="text" id="e-codResiduoIbama" placeholder="Ex.: 200101" />
+        </div>
+        <div class="field">
+          <label>Quantidade</label>
+          <input type="number" id="e-quantidade" placeholder="Ex.: 20" step="any" />
+        </div>
+        <div class="field">
+          <label>Código de Acondicionamento</label>
+          <input type="number" id="e-codAcondicionamento" placeholder="Ex.: 10" />
+        </div>
+        <div class="field">
+          <label>Código de Classe</label>
+          <input type="number" id="e-codClasse" placeholder="Ex.: 2" />
+        </div>
+        <div class="field">
+          <label>Código de Tecnologia</label>
+          <input type="number" id="e-codTecnologia" placeholder="Ex.: 32" />
+        </div>
+        <div class="field">
+          <label>Código de Estado Físico</label>
+          <input type="number" id="e-codEstadoFisico" placeholder="Ex.: 1" />
+        </div>
+        <div class="field">
+          <label>Código de Unidade de Medida</label>
+          <input type="number" id="e-codUnidadeMedida" placeholder="Ex.: 2" />
+        </div>
+      </div>
+
+      <p class="section-title">Extras</p>
+      <div class="grid">
+        <div class="field">
+          <label>Seu Código de Referência <span class="opt">opcional</span></label>
+          <input type="text" id="e-seuCodigoReferencia" placeholder="Código interno (opcional)" />
+        </div>
+      </div>
+
+      <p class="section-title">Observações</p>
+      <div class="field">
+        <label>Observações <span class="opt">opcional</span></label>
+        <textarea id="e-observacoes" placeholder="Informações complementares…"></textarea>
+      </div>
+
+      <button class="btn-submit" id="btn-emitir" onclick="submitEmitir()">
+        <span class="spinner"></span>
+        <span class="btn-text" data-label="Emitir MTR"></span>
+      </button>
+      <div class="response-box" id="resp-emitir"></div>
+    </div>
+
+    <!-- ===== TAB 2: Dar Baixa no MTR ===== -->
+    <div id="panel-baixa" class="tab-panel">
+
+      <p class="section-title">Identificação do Manifesto</p>
+      <div class="grid">
+        <div class="field">
+          <label>Número do Manifesto <span class="opt">10 dígitos</span></label>
+          <input type="text" id="b-numeroManifesto" placeholder="0000000001" maxlength="10" />
+        </div>
+        <div class="field">
+          <label>Data de Recebimento <span class="opt">AAAAMMDD</span></label>
+          <input type="text" id="b-dataRecebimento" placeholder="20250615" maxlength="8" />
+        </div>
+        <div class="field">
+          <label>CNPJ do Gerador</label>
+          <input type="text" id="b-cnpjGerador" placeholder="00.000.000/0000-00" maxlength="18" />
+        </div>
+        <div class="field">
+          <label>CNPJ do Transportador</label>
+          <input type="text" id="b-cnpjTransportador" placeholder="00.000.000/0000-00" maxlength="18" />
+        </div>
+      </div>
+
+      <p class="section-title">Responsável pelo Recebimento</p>
+      <div class="grid">
+        <div class="field">
+          <label>Nome do Responsável pelo Recebimento</label>
+          <input type="text" id="b-nomeResponsavel" placeholder="Victoria Abrahão" />
+        </div>
+        <div class="field">
+          <label>Cargo do Responsável</label>
+          <input type="text" id="b-cargoResponsavel" placeholder="Ex.: Analista Ambiental" />
+        </div>
+      </div>
+
+      <p class="section-title">Transporte</p>
+      <div class="grid">
+        <div class="field">
+          <label>Nome do Motorista</label>
+          <input type="text" id="b-nomeMotorista" placeholder="Nome completo" />
+        </div>
+        <div class="field">
+          <label>Placa do Veículo</label>
+          <input type="text" id="b-placaVeiculo" placeholder="ABC-1234" maxlength="8" />
+        </div>
+      </div>
+
+      <p class="section-title">Resíduo Recebido</p>
+      <div class="grid">
+        <div class="field">
+          <label>Código do Resíduo (IBAMA)</label>
+          <input type="text" id="b-codResiduoIbama" placeholder="Ex.: 200101" />
+        </div>
+        <div class="field">
+          <label>Quantidade Recebida</label>
+          <input type="number" id="b-quantidadeRecebida" placeholder="Ex.: 20" step="any" />
+        </div>
+        <div class="field">
+          <label>Código de Tecnologia</label>
+          <input type="number" id="b-codTecnologia" placeholder="Ex.: 32" />
+        </div>
+        <div class="field">
+          <label>Código de Estado Físico</label>
+          <input type="number" id="b-codEstadoFisico" placeholder="Ex.: 1" />
+        </div>
+      </div>
+
+      <p class="section-title">Observações do Recebimento</p>
+      <div class="field">
+        <label>Observações do Recebimento <span class="opt">opcional</span></label>
+        <textarea id="b-observacoes" placeholder="Informações complementares…"></textarea>
+      </div>
+
+      <button class="btn-submit" id="btn-baixa" onclick="submitBaixa()">
+        <span class="spinner"></span>
+        <span class="btn-text" data-label="Dar Baixa no MTR"></span>
+      </button>
+      <div class="response-box" id="resp-baixa"></div>
+    </div>
+
+  </div><!-- /.card -->
+</div><!-- /.container -->
+
+<script>
+  // ── Webhook URLs ────────────────────────────────────────────────────────────
+  const WEBHOOK_EMITIR = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/831fe3a5-9651-4b0f-9afd-e889cca332e6';
+  const WEBHOOK_BAIXA  = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/e2ee3b8d-8e87-4a68-92de-8f632f257538';
+  // ────────────────────────────────────────────────────────────────────────────
+
+  function switchTab(name, el) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    el.classList.add('active');
+  }
+
+  function val(id)    { return document.getElementById(id).value.trim(); }
+  function numVal(id) { const v = val(id); return v === '' ? null : Number(v); }
+  function opt(v)     { return v === '' || v === null ? undefined : v; }
+
+  function setLoading(btn, isLoading) {
+    btn.disabled = isLoading;
+    btn.classList.toggle('loading', isLoading);
+  }
+
+  function showResponse(boxId, data, isError) {
+    const box = document.getElementById(boxId);
+    box.className = 'response-box ' + (isError ? 'error' : 'success');
+    let text;
+    if (typeof data === 'string') {
+      text = data;
+    } else {
+      try { text = JSON.stringify(data, null, 2); } catch { text = String(data); }
+    }
+    box.textContent = isError ? '✗ Erro: ' + text : '✓ Sucesso:\n' + text;
+  }
+
+  async function postJSON(url, payload, btnId, respId) {
+    const btn = document.getElementById(btnId);
+    const clean = Object.fromEntries(
+      Object.entries(payload).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    );
+
+    setLoading(btn, true);
+    document.getElementById(respId).className = 'response-box';
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(clean),
+      });
+      let body;
+      const ct = res.headers.get('content-type') || '';
+      try { body = ct.includes('json') ? await res.json() : await res.text(); }
+      catch { body = await res.text(); }
+      showResponse(respId, body, !res.ok);
+    } catch (err) {
+      showResponse(respId, err.message || 'Falha na requisição', true);
+    } finally {
+      setLoading(btn, false);
+    }
+  }
+
+  function submitEmitir() {
+    const payload = {
+      'CNPJ do Gerador':                        val('e-cnpjGerador'),
+      'Código da Unidade do Gerador':           numVal('e-codUnidadeGerador'),
+      'CNPJ do Transportador':                  opt(val('e-cnpjTransportador')),
+      'Código da Unidade do Transportador':     opt(numVal('e-codUnidadeTransportador')),
+      'Nome do Responsável':                    val('e-nomeResponsavel'),
+      'Cargo do Responsável':                   val('e-cargoResponsavel'),
+      'Nome do Motorista':                      opt(val('e-nomeMotorista')),
+      'Placa do Veículo':                       opt(val('e-placaVeiculo')),
+      'Data de Expedição (AAAAMMDD)':           opt(val('e-dataExpedicao')),
+      'Código do Resíduo (IBAMA)':              val('e-codResiduoIbama'),
+      'Quantidade':                             numVal('e-quantidade'),
+      'Código de Acondicionamento':             numVal('e-codAcondicionamento'),
+      'Código de Classe':                       numVal('e-codClasse'),
+      'Código de Tecnologia':                   numVal('e-codTecnologia'),
+      'Código de Estado Físico':                numVal('e-codEstadoFisico'),
+      'Código de Unidade de Medida':            numVal('e-codUnidadeMedida'),
+      'Seu Código de Referência':               opt(val('e-seuCodigoReferencia')),
+      'Observações':                            opt(val('e-observacoes')),
+    };
+    postJSON(WEBHOOK_EMITIR, payload, 'btn-emitir', 'resp-emitir');
+  }
+
+  function submitBaixa() {
+    const payload = {
+      'Número do Manifesto (10 dígitos)':       val('b-numeroManifesto'),
+      'CNPJ do Gerador':                        val('b-cnpjGerador'),
+      'CNPJ do Transportador':                  val('b-cnpjTransportador'),
+      'Nome do Responsável pelo Recebimento':   val('b-nomeResponsavel'),
+      'Cargo do Responsável':                   val('b-cargoResponsavel'),
+      'Data de Recebimento (AAAAMMDD)':         val('b-dataRecebimento'),
+      'Nome do Motorista':                      val('b-nomeMotorista'),
+      'Placa do Veículo':                       val('b-placaVeiculo'),
+      'Código do Resíduo (IBAMA)':              val('b-codResiduoIbama'),
+      'Quantidade Recebida':                    numVal('b-quantidadeRecebida'),
+      'Código de Tecnologia':                   numVal('b-codTecnologia'),
+      'Código de Estado Físico':                numVal('b-codEstadoFisico'),
+      'Observações do Recebimento':             opt(val('b-observacoes')),
+    };
+    postJSON(WEBHOOK_BAIXA, payload, 'btn-baixa', 'resp-baixa');
+  }
+</script>
+
+</body>
+</html>
