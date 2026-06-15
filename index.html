@@ -710,9 +710,10 @@
     el.classList.add('active');
   }
 
-  function val(id)    { return document.getElementById(id).value.trim(); }
-  function numVal(id) { const v = val(id); return v === '' ? null : Number(v); }
-  function opt(v)     { return v === '' || v === null ? undefined : v; }
+  function val(id)         { return document.getElementById(id).value.trim(); }
+  function numVal(id)      { const v = val(id); return v === '' ? undefined : Number(v); }
+  function nullableNum(id) { const v = val(id); return v === '' ? null    : Number(v); }
+  function opt(v)          { return v === '' || v === null ? undefined : v; }
 
   function setLoading(btn, isLoading) {
     btn.disabled = isLoading;
@@ -736,7 +737,7 @@
   async function postJSON(url, payload, btnId, respId) {
     const btn = document.getElementById(btnId);
     const clean = Object.fromEntries(
-      Object.entries(payload).filter(([, v]) => v !== undefined && v !== null && v !== '')
+      Object.entries(payload).filter(([, v]) => v !== undefined && v !== '')
     );
 
     setLoading(btn, true);
@@ -764,9 +765,9 @@
     saveLastMTR();
     const payload = {
       'CNPJ do Gerador':                    val('e-cnpjGerador'),
-      'Código da Unidade do Gerador':       numVal('e-codUnidadeGerador'),
+      'Código da Unidade do Gerador':       nullableNum('e-codUnidadeGerador'),
       'CNPJ do Transportador':              opt(val('e-cnpjTransportador')),
-      'Código da Unidade do Transportador': opt(numVal('e-codUnidadeTransportador')),
+      'Código da Unidade do Transportador': nullableNum('e-codUnidadeTransportador'),
       'Nome do Responsável':                val('e-nomeResponsavel'),
       'Cargo do Responsável':               val('e-cargoResponsavel'),
       'Nome do Motorista':                  opt(val('e-nomeMotorista')),
