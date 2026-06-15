@@ -236,6 +236,33 @@
       margin-top: 5px;
       display: none;
     }
+
+    /* ── Botão Replicar ───────────────────────────────────────────── */
+    .btn-replicate {
+      display: none;
+      width: 100%;
+      margin-bottom: 20px;
+      padding: 10px 16px;
+      background: #fff;
+      border: 1.5px dashed #1a5276;
+      border-radius: 6px;
+      color: #1a5276;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+      text-align: left;
+      gap: 8px;
+      align-items: center;
+    }
+    .btn-replicate:hover { background: #ebf0f7; }
+    .btn-replicate .rep-meta {
+      display: block;
+      font-weight: 400;
+      font-size: .75rem;
+      color: #718096;
+      margin-top: 1px;
+    }
   </style>
 </head>
 <body>
@@ -256,7 +283,12 @@
     <!-- ===== TAB 1: Emitir MTR ===== -->
     <div id="panel-emitir" class="tab-panel active">
 
-      <p class="section-title">Gerador</p>
+      <button type="button" class="btn-replicate" id="btn-replicate" onclick="replicarUltimoMTR()">
+        ↩ Replicar último MTR emitido
+        <span class="rep-meta" id="rep-meta"></span>
+      </button>
+
+            <p class="section-title">Gerador</p>
       <div class="grid">
         <div class="field">
           <label>CNPJ do Gerador</label>
@@ -727,6 +759,7 @@
   }
 
   function submitEmitir() {
+    saveLastMTR();
     const payload = {
       'CNPJ do Gerador':                    val('e-cnpjGerador'),
       'Código da Unidade do Gerador':       numVal('e-codUnidadeGerador'),
@@ -769,7 +802,95 @@
     postJSON(WEBHOOK_BAIXA, payload, 'btn-baixa', 'resp-baixa');
   }
 
+
+  // ── Replicar último MTR ──────────────────────────────────────────────────────
+  function saveLastMTR() {
+    const activeCnpjBtn = document.querySelector('.cnpj-btn.active');
+    const snapshot = {
+      ts: new Date().toLocaleString('pt-BR'),
+      cnpjGeradorBtnValue: activeCnpjBtn ? activeCnpjBtn.dataset.cnpj : '__outro__',
+      cnpjGerador:             document.getElementById('e-cnpjGerador').value,
+      codUnidadeGerador:       document.getElementById('e-codUnidadeGerador').value,
+      cnpjTransportador:       document.getElementById('e-cnpjTransportador').value,
+      codUnidadeTransportador: document.getElementById('e-codUnidadeTransportador').value,
+      nomeResponsavel:         document.getElementById('e-nomeResponsavel').value,
+      cargoResponsavel:        document.getElementById('e-cargoResponsavel').value,
+      nomeMotorista:           document.getElementById('e-nomeMotorista').value,
+      placaVeiculo:            document.getElementById('e-placaVeiculo').value,
+      dataExpedicao:           document.getElementById('e-dataExpedicao').value,
+      codResiduoIbama:         document.getElementById('e-codResiduoIbama').value,
+      codResiduoIbamaLabel:    document.getElementById('e-codResiduoIbama-sel').textContent,
+      quantidade:              document.getElementById('e-quantidade').value,
+      codAcondicionamento:     document.getElementById('e-codAcondicionamento').value,
+      codClasse:               document.getElementById('e-codClasse').value,
+      codTecnologia:           document.getElementById('e-codTecnologia').value,
+      codEstadoFisico:         document.getElementById('e-codEstadoFisico').value,
+      codUnidadeMedida:        document.getElementById('e-codUnidadeMedida').value,
+      seuCodigoReferencia:     document.getElementById('e-seuCodigoReferencia').value,
+      observacoes:             document.getElementById('e-observacoes').value,
+    };
+    localStorage.setItem('emtr_ultimo', JSON.stringify(snapshot));
+  }
+
+  function replicarUltimoMTR() {
+    const raw = localStorage.getItem('emtr_ultimo');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+
+    // CNPJ Gerador — botão ou "Outro"
+    document.querySelectorAll('.cnpj-btn').forEach(btn => {
+      btn.classList.remove('active');
+      if (btn.dataset.cnpj === d.cnpjGeradorBtnValue) {
+        btn.classList.add('active');
+        const inp = document.getElementById('e-cnpjGerador');
+        if (d.cnpjGeradorBtnValue === '') {
+          inp.style.display = ''; inp.value = d.cnpjGerador;
+        } else {
+          inp.style.display = 'none'; inp.value = d.cnpjGerador;
+        }
+      }
+    });
+
+    // Campos de texto simples
+    ['codUnidadeGerador','cnpjTransportador','codUnidadeTransportador',
+     'nomeResponsavel','cargoResponsavel','nomeMotorista','placaVeiculo',
+     'dataExpedicao','quantidade','seuCodigoReferencia','observacoes'
+    ].forEach(f => {
+      const el = document.getElementById('e-' + f);
+      if (el) el.value = d[f] || '';
+    });
+
+    // Selects (dropdowns)
+    ['codAcondicionamento','codClasse','codTecnologia','codEstadoFisico','codUnidadeMedida'
+    ].forEach(f => {
+      const el = document.getElementById('e-' + f);
+      if (el && d[f]) el.value = d[f];
+    });
+
+    // Combobox IBAMA
+    if (d.codResiduoIbama) {
+      document.getElementById('e-codResiduoIbama').value = d.codResiduoIbama;
+      const sel = document.getElementById('e-codResiduoIbama-sel');
+      sel.textContent = d.codResiduoIbamaLabel || d.codResiduoIbama;
+      sel.style.display = 'block';
+    }
+
+    // Rolar para o topo do formulário
+    document.getElementById('panel-emitir').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function checkLastMTR() {
+    const raw = localStorage.getItem('emtr_ultimo');
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    const btn = document.getElementById('btn-replicate');
+    btn.style.display = 'flex';
+    document.getElementById('rep-meta').textContent = 'Último envio: ' + d.ts;
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   initSelects();
+  checkLastMTR();
   initCombo("e-codResiduoIbama-search","e-codResiduoIbama","e-codResiduoIbama-dd","e-codResiduoIbama-sel");
   initCombo("b-codResiduoIbama-search","b-codResiduoIbama","b-codResiduoIbama-dd","b-codResiduoIbama-sel");
 </script>
