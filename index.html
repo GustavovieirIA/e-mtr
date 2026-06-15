@@ -715,6 +715,13 @@
   function nullableNum(id) { const v = val(id); return v === '' ? null    : Number(v); }
   function opt(v)          { return v === '' || v === null ? undefined : v; }
 
+  function digitosCNPJ(raw) { return raw.replace(/\D/g, ''); }
+  function cnpjOk(raw)      { const d = digitosCNPJ(raw); return d === '' || d.length === 14; }
+  function erroCNPJ(campo, raw) {
+    const d = digitosCNPJ(raw);
+    return `❌ CNPJ inválido no campo "${campo}": ${d.length} dígito${d.length !== 1 ? 's' : ''} digitado${d.length !== 1 ? 's' : ''}, eram esperados 14.\nValor recebido: ${raw}`;
+  }
+
   function setLoading(btn, isLoading) {
     btn.disabled = isLoading;
     btn.classList.toggle('loading', isLoading);
@@ -762,6 +769,11 @@
   }
 
   function submitEmitir() {
+    const cnpjGer   = val('e-cnpjGerador');
+    const cnpjTransp = val('e-cnpjTransportador');
+    if (!cnpjOk(cnpjGer))   { showResponse('resp-emitir', erroCNPJ('CNPJ do Gerador', cnpjGer), true); return; }
+    if (!cnpjOk(cnpjTransp)){ showResponse('resp-emitir', erroCNPJ('CNPJ do Transportador', cnpjTransp), true); return; }
+
     saveLastMTR();
     const payload = {
       'CNPJ do Gerador':                    val('e-cnpjGerador'),
@@ -787,6 +799,11 @@
   }
 
   function submitBaixa() {
+    const cnpjGer   = val('b-cnpjGerador');
+    const cnpjTransp = val('b-cnpjTransportador');
+    if (!cnpjOk(cnpjGer))   { showResponse('resp-baixa', erroCNPJ('CNPJ do Gerador', cnpjGer), true); return; }
+    if (!cnpjOk(cnpjTransp)){ showResponse('resp-baixa', erroCNPJ('CNPJ do Transportador', cnpjTransp), true); return; }
+
     const payload = {
       'Número do Manifesto (10 dígitos)':     val('b-numeroManifesto'),
       'CNPJ do Gerador':                      val('b-cnpjGerador'),
