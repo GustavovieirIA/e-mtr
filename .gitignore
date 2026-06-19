@@ -1,0 +1,3 @@
+.vercel
+# Workflows n8n contêm credenciais — nunca commitar
+*.json
