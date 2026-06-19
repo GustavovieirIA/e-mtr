@@ -608,8 +608,8 @@
               <tr>
                 <th>Nº MTR</th>
                 <th>Data Emissão</th>
-                <th>CNPJ Gerador</th>
-                <th>CNPJ Transportador</th>
+                <th>Gerador</th>
+                <th>Transportador</th>
                 <th>Situação</th>
               </tr>
             </thead>
@@ -947,6 +947,21 @@
 
   // ── Consultar MTRs ───────────────────────────────────────────────────────────
   let _ultimoResultado = [];
+  let _nomeMap = {};
+
+  async function fetchNomeCNPJ(cnpj) {
+    if (!cnpj || cnpj === '—') return '—';
+    if (_nomeMap[cnpj] !== undefined) return _nomeMap[cnpj];
+    try {
+      const r = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + cnpj);
+      if (!r.ok) return (_nomeMap[cnpj] = cnpj);
+      const d = await r.json();
+      const nome = (d.nome_fantasia && d.nome_fantasia.trim()) ? d.nome_fantasia.trim() : (d.razao_social || cnpj);
+      return (_nomeMap[cnpj] = nome);
+    } catch {
+      return (_nomeMap[cnpj] = cnpj);
+    }
+  }
 
   function toAPIDate(isoDate) {
     // "2025-06-15" → "20250615"
@@ -974,7 +989,7 @@
     return `<span class="badge badge-open">${sit}</span>`;
   }
 
-  function renderResults(data) {
+  async function renderResults(data) {
     const manifests = data.manifests || [];
     _ultimoResultado = manifests;
     const wrap = document.getElementById('consulta-results');
@@ -987,36 +1002,56 @@
       return;
     }
 
+    // Exibe tabela vazia imediatamente enquanto busca nomes
+    count.textContent = `${manifests.length} MTR(s) encontrado(s) — buscando nomes…`;
+    wrap.style.display = 'block';
+    document.getElementById('resp-consulta').className = 'response-box';
+
+    // Busca nomes de todas as empresas únicas em paralelo
+    const cnpjs = [...new Set(manifests.flatMap(m => [m.cnpGerador, m.cnpTransportador].filter(Boolean)))];
+    await Promise.all(cnpjs.map(fetchNomeCNPJ));
+
     count.textContent = `${manifests.length} MTR(s) encontrado(s)`;
     tbody.innerHTML = manifests.map(m => {
       const codigo     = m.manifestoCodigo ?? m.codigo ?? '—';
       const dataEmis   = formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao);
-      const cnpjGer    = m.cnpGerador   ?? m.cnpjGerador   ?? '—';
-      const cnpjTransp = m.cnpTransportador ?? m.cnpjTransportador ?? '—';
+      const cnpjGer    = m.cnpGerador    ?? '—';
+      const cnpjTransp = m.cnpTransportador ?? '—';
+      const nomeGer    = _nomeMap[cnpjGer]    || cnpjGer;
+      const nomeTransp = _nomeMap[cnpjTransp] || cnpjTransp;
       const situacao   = situacaoBadge(m.situacaoManifestoCodigo ?? m.situacao ?? m.manifSituacao ?? m.status);
       return `<tr>
         <td><strong>${codigo}</strong></td>
         <td>${dataEmis}</td>
-        <td style="font-family:monospace">${cnpjGer}</td>
-        <td style="font-family:monospace">${cnpjTransp}</td>
+        <td>
+          <span style="font-size:.72rem;color:#718096;font-family:monospace">${cnpjGer}</span><br>
+          <strong style="font-size:.82rem">${nomeGer}</strong>
+        </td>
+        <td>
+          <span style="font-size:.72rem;color:#718096;font-family:monospace">${cnpjTransp}</span><br>
+          <strong style="font-size:.82rem">${nomeTransp}</strong>
+        </td>
         <td>${situacao}</td>
       </tr>`;
     }).join('');
-
-    wrap.style.display = 'block';
-    document.getElementById('resp-consulta').className = 'response-box';
   }
 
   function exportarCSV() {
     if (!_ultimoResultado.length) return;
-    const headers = ['Nº MTR','Data Emissão','CNPJ Gerador','CNPJ Transportador','Situação'];
-    const rows = _ultimoResultado.map(m => [
-      m.manifestoCodigo ?? m.codigo ?? '',
-      formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
-      m.cnpGerador  ?? m.cnpjGerador  ?? '',
-      m.cnpTransportador ?? m.cnpjTransportador ?? '',
-      m.situacao ?? (m.situacaoManifestoCodigo === 1 ? 'Emitido (aguarda baixa)' : m.situacaoManifestoCodigo === 3 ? 'Recebido' : m.situacaoManifestoCodigo === 4 ? 'Cancelado' : 'Em aberto')
-    ].map(v => `"${String(v).replace(/"/g,'""')}"`));
+    const headers = ['Nº MTR','Data Emissão','CNPJ Gerador','Nome Gerador','CNPJ Transportador','Nome Transportador','Situação'];
+    const rows = _ultimoResultado.map(m => {
+      const cg = m.cnpGerador ?? m.cnpjGerador ?? '';
+      const ct = m.cnpTransportador ?? m.cnpjTransportador ?? '';
+      return [
+        m.manifestoCodigo ?? m.codigo ?? '',
+        formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
+        cg,
+        _nomeMap[cg] || cg,
+        ct,
+        _nomeMap[ct] || ct,
+        m.situacao ?? (m.situacaoManifestoCodigo === 1 ? 'Emitido (aguarda baixa)' : m.situacaoManifestoCodigo === 3 ? 'Recebido' : m.situacaoManifestoCodigo === 4 ? 'Cancelado' : 'Em aberto')
+      ].map(v => `"${String(v).replace(/"/g,'""')}"`);
+    });
     const csv = [headers.map(h=>`"${h}"`), ...rows].map(r=>r.join(';')).join('\n');
     const blob = new Blob(['\ufeff'+csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -1055,7 +1090,7 @@
       if (typeof body === 'string') {
         showResponse('resp-consulta', body, body.includes('❌'));
       } else {
-        renderResults(body);
+        await renderResults(body);
         if (body.mensagem) showResponse('resp-consulta', body.mensagem, body.mensagem.includes('❌'));
       }
     } catch (err) {
