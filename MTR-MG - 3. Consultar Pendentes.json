@@ -60,7 +60,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const resp = $input.first().json;\n\nif (resp.retornoCodigo !== undefined && resp.retornoCodigo !== 0) {\n  return [{ json: {\n    _done: true, sucesso: false, total: 0, totalPendentes: 0, manifests: [],\n    mensagem: `❌ Erro ${resp.retornoCodigo}: ${resp.retorno}`\n  } }];\n}\n\nconst codigos = resp.codigos || [];\nconst auth = $('Extrai Token').first().json;\n\nif (codigos.length === 0) {\n  return [{ json: {\n    _done: true, sucesso: true, total: 0, totalPendentes: 0, manifests: [],\n    mensagem: `✅ Nenhum MTR encontrado no período`\n  } }];\n}\n\n// Passa todos os barcodes — filtragem por cnpDestinador e situação é feita em Agrega Pendentes\nreturn codigos.map(barcode => ({ json: { barcode, token: auth.token, chave: auth.chave } }));"
+        "jsCode": "const resp = $input.first().json;\n\nif (resp.retornoCodigo !== undefined && resp.retornoCodigo !== 0) {\n  return [{ json: {\n    _done: true, sucesso: false, total: 0, totalPendentes: 0, manifests: [],\n    mensagem: `❌ Erro ${resp.retornoCodigo}: ${resp.retorno}`\n  } }];\n}\n\nconst codigos = resp.codigos || [];\nconst auth = $('Extrai Token').first().json;\n\nif (codigos.length === 0) {\n  return [{ json: {\n    _done: true, sucesso: true, total: 0, totalPendentes: 0, manifests: [],\n    mensagem: `✅ Nenhum MTR encontrado no período`\n  } }];\n}\n\n// Barcodes reais têm 43 chars (9 prefixo + 10 nº manifesto + 8+8+8 unidades).\n// Extrai o número do manifesto (10 dígitos) da posição 9-18.\nreturn codigos.map(barcode => ({\n  json: {\n    barcode,\n    manifestoNumero: barcode.length >= 19 ? barcode.substring(9, 19) : barcode.substring(0, 10),\n    token: auth.token,\n    chave: auth.chave\n  }\n}));"
       },
       "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
       "name": "Filtra Destinador",
@@ -104,7 +104,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ 'https://mtr.meioambiente.mg.gov.br/api/retornaManifesto/' + $json.barcode }}",
+        "url": "={{ 'https://mtr.meioambiente.mg.gov.br/api/retornaManifestoPorNumero/' + $json.manifestoNumero }}",
         "sendHeaders": true,
         "specifyHeaders": "json",
         "jsonHeaders": "={\n  \"Content-Type\": \"application/json\",\n  \"Authorization\": \"{{ 'Bearer ' + $json.token }}\",\n  \"chave_feam\": \"{{ $json.chave }}\"\n}",
