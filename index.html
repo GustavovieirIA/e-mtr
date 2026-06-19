@@ -1605,7 +1605,10 @@
         if (body.mensagem) showResponse('resp-consulta', body.mensagem, body.mensagem.includes('❌'));
       }
     } catch (err) {
-      showResponse('resp-consulta', '❌ ' + (err.message || 'Falha na requisição'), true);
+      const msg = err.name === 'AbortError'
+        ? '❌ Timeout — o n8n demorou mais de 3 min para responder. Verifique os logs do workflow.'
+        : '❌ Sem resposta do n8n (Failed to fetch). Possíveis causas: workflow desativado, servidor offline ou erro de CORS. Verifique se o workflow 3 está ATIVO no n8n.';
+      showResponse('resp-consulta', msg, true);
     } finally {
       btn.disabled = false; btn.textContent = 'Buscar MTRs';
     }
