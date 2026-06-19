@@ -1,0 +1,122 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "c7e4a2f1-3b8d-4c9e-a5f2-d1b6c8e3f7a4",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Consultar MTRs Webhook",
+      "webhookId": "c7e4a2f1-3b8d-4c9e-a5f2-d1b6c8e3f7a4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://mtr.meioambiente.mg.gov.br/api/gettoken",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"pessoaCodigo\": 255271,\n  \"pessoaCnpj\": \"07711109000186\",\n  \"usuarioCpf\": \"09088847614\",\n  \"senha\": \"090888\"\n}",
+        "options": {}
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Get Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const auth = $input.first().json;\nif (auth.retornoCodigo !== 0) throw new Error('Falha autenticação: ' + auth.retorno);\nreturn [{ json: { token: auth.token, chave: auth.chave } }];"
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Extrai Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const form = $('Consultar MTRs Webhook').first().json.body;\nconst auth = $input.first().json;\n\n// ⚠️ VERIFICAR: confirme o endpoint correto com a FEAM/MTR-MG\n// Candidatos: listarManifestos, consultarManifestos, listarManifestosParaReceber\nconst payload = {\n  cnpDestinador: '07711109000186',\n  codUnidadeDestinador: 255271,\n  dataInicio: form['dataInicio'],\n  dataFim: form['dataFim']\n};\n\nreturn [{ json: { payload, token: auth.token, chave: auth.chave } }];"
+      },
+      "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+      "name": "Monta Payload Consulta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://mtr.meioambiente.mg.gov.br/api/listarManifestos",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Content-Type\": \"application/json\",\n  \"Authorization\": \"{{ 'Bearer ' + $json.token }}\",\n  \"chave_feam\": \"{{ $json.chave }}\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {}
+      },
+      "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
+      "name": "Consulta MTRs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\n\n// Erro geral da API\nif (resp.retornoCodigo !== undefined && resp.retornoCodigo !== 0) {\n  return [{ json: {\n    sucesso: false,\n    total: 0,\n    manifests: [],\n    mensagem: `❌ Erro ${resp.retornoCodigo}: ${resp.retorno}`\n  }}];\n}\n\n// Normaliza: a API pode retornar array direto ou dentro de uma chave\nconst lista = Array.isArray(resp)\n  ? resp\n  : (resp.manifestoJSONDtos || resp.manifests || resp.data || []);\n\nconst pendentes = lista.filter(m => {\n  // Filtra apenas os que ainda não têm baixa (ajuste o campo conforme a API retornar)\n  const situacao = m.situacao ?? m.manifSituacao ?? m.status ?? null;\n  // null/undefined = assumir pendente; 1 = emitido sem baixa (ajuste se necessário)\n  return situacao === null || situacao === undefined || situacao === 1 || situacao === '1';\n});\n\nreturn [{ json: {\n  sucesso: true,\n  total: lista.length,\n  totalPendentes: pendentes.length,\n  manifests: lista,\n  mensagem: `✅ ${lista.length} MTR(s) encontrado(s), ${pendentes.length} pendente(s) de baixa`\n} }];"
+      },
+      "id": "f6a7b8c9-d0e1-2345-fabc-456789012345",
+      "name": "Processa Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-3456-abcd-567890123456",
+      "name": "Retorna Resultado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1440, 0]
+    }
+  ],
+  "connections": {
+    "Consultar MTRs Webhook": {
+      "main": [[{ "node": "Get Token", "type": "main", "index": 0 }]]
+    },
+    "Get Token": {
+      "main": [[{ "node": "Extrai Token", "type": "main", "index": 0 }]]
+    },
+    "Extrai Token": {
+      "main": [[{ "node": "Monta Payload Consulta", "type": "main", "index": 0 }]]
+    },
+    "Monta Payload Consulta": {
+      "main": [[{ "node": "Consulta MTRs", "type": "main", "index": 0 }]]
+    },
+    "Consulta MTRs": {
+      "main": [[{ "node": "Processa Resposta", "type": "main", "index": 0 }]]
+    },
+    "Processa Resposta": {
+      "main": [[{ "node": "Retorna Resultado", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "146a52c9d0212188bab590252ea55e12202688754d829cc9ac77eb5e097e324c"
+  }
+}

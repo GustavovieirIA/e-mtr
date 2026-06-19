@@ -263,6 +263,82 @@
       color: #718096;
       margin-top: 1px;
     }
+
+    /* ── Consulta / tabela ───────────────────────────────────────────── */
+    .date-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
+    .date-row .field { margin: 0; }
+    input[type="date"] {
+      padding: 8px 11px;
+      border: 1px solid #cbd5e0;
+      border-radius: 5px;
+      font-size: .88rem;
+      color: #1a1a2e;
+      background: #f7f9fc;
+      width: 100%;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input[type="date"]:focus {
+      outline: none; border-color: #1a5276;
+      box-shadow: 0 0 0 3px rgba(26,82,118,.12); background: #fff;
+    }
+    .btn-search {
+      padding: 9px 20px;
+      background: #1a5276; color: #fff;
+      border: none; border-radius: 5px;
+      font-size: .88rem; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+      transition: background .15s;
+    }
+    .btn-search:hover:not(:disabled) { background: #154360; }
+    .btn-search:disabled { opacity: .6; cursor: not-allowed; }
+
+    .results-meta {
+      display: flex; justify-content: space-between; align-items: center;
+      margin: 20px 0 10px; flex-wrap: wrap; gap: 8px;
+    }
+    .results-count { font-size: .85rem; color: #4a5568; font-weight: 600; }
+    .btn-export {
+      padding: 7px 14px;
+      background: #276221; color: #fff;
+      border: none; border-radius: 5px;
+      font-size: .82rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-export:hover { background: #1e4d19; }
+
+    .results-table-wrap { overflow-x: auto; }
+    .results-table {
+      width: 100%; border-collapse: collapse;
+      font-size: .82rem;
+    }
+    .results-table th {
+      background: #1a5276; color: #fff;
+      padding: 9px 10px; text-align: left;
+      font-size: .75rem; font-weight: 700;
+      letter-spacing: .4px; white-space: nowrap;
+    }
+    .results-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e8ecf0;
+      color: #2d3748; vertical-align: middle;
+    }
+    .results-table tr:last-child td { border-bottom: none; }
+    .results-table tr:nth-child(even) td { background: #f7f9fc; }
+    .results-table tr:hover td { background: #ebf0f7; }
+    .badge {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 10px; font-size: .72rem; font-weight: 700;
+    }
+    .badge-open   { background: #fefcbf; color: #744210; }
+    .badge-done   { background: #e6ffed; color: #22543d; }
+    .badge-cancel { background: #fff5f5; color: #742a2a; }
+    .no-results {
+      text-align: center; padding: 40px 20px;
+      color: #718096; font-size: .9rem;
+    }
+    @media (max-width: 560px) {
+      .date-row { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -276,6 +352,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('emitir', this)">Emitir MTR</button>
     <button class="tab-btn"        onclick="switchTab('baixa', this)">Dar Baixa no MTR</button>
+    <button class="tab-btn"        onclick="switchTab('consulta', this)">Consultar MTRs</button>
   </div>
 
   <div class="card">
@@ -500,13 +577,59 @@
       <div class="response-box" id="resp-baixa"></div>
     </div>
 
+
+    <!-- ===== TAB 3: Consultar MTRs ===== -->
+    <div id="panel-consulta" class="tab-panel">
+
+      <p class="section-title">Período</p>
+      <div class="date-row">
+        <div class="field">
+          <label>Data Início</label>
+          <input type="date" id="c-dataInicio" />
+        </div>
+        <div class="field">
+          <label>Data Fim</label>
+          <input type="date" id="c-dataFim" />
+        </div>
+        <button class="btn-search" id="btn-consulta" onclick="submitConsulta()">
+          Buscar MTRs
+        </button>
+      </div>
+      <div class="response-box" id="resp-consulta"></div>
+
+      <div id="consulta-results" style="display:none">
+        <div class="results-meta">
+          <span class="results-count" id="results-count"></span>
+          <button class="btn-export" onclick="exportarCSV()">⬇ Exportar CSV</button>
+        </div>
+        <div class="results-table-wrap">
+          <table class="results-table" id="results-table">
+            <thead>
+              <tr>
+                <th>Nº MTR</th>
+                <th>Data Emissão</th>
+                <th>CNPJ Gerador</th>
+                <th>Nome Gerador</th>
+                <th>CNPJ Transportador</th>
+                <th>Nome Transportador</th>
+                <th>Situação</th>
+              </tr>
+            </thead>
+            <tbody id="results-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
   </div><!-- /.card -->
 </div><!-- /.container -->
 
 <script>
   // ── Webhook URLs ─────────────────────────────────────────────────────────────
   const WEBHOOK_EMITIR = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/831fe3a5-9651-4b0f-9afd-e889cca332e6';
-  const WEBHOOK_BAIXA  = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/e2ee3b8d-8e87-4a68-92de-8f632f257538';
+  const WEBHOOK_BAIXA    = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/e2ee3b8d-8e87-4a68-92de-8f632f257538';
+  const WEBHOOK_CONSULTA = 'COLE_AQUI_A_URL_DO_WEBHOOK_DE_CONSULTA'; // após importar workflow 3 no n8n
   // ─────────────────────────────────────────────────────────────────────────────
 
   // ── Tabelas de domínio ───────────────────────────────────────────────────────
@@ -822,6 +945,129 @@
     postJSON(WEBHOOK_BAIXA, payload, 'btn-baixa', 'resp-baixa');
   }
 
+
+
+  // ── Consultar MTRs ───────────────────────────────────────────────────────────
+  let _ultimoResultado = [];
+
+  function toAPIDate(isoDate) {
+    // "2025-06-15" → "20250615"
+    return isoDate.replace(/-/g, '');
+  }
+
+  function formatDate(apiDate) {
+    if (!apiDate) return '—';
+    const s = String(apiDate);
+    if (s.length === 8) return s.slice(6,8)+'/'+s.slice(4,6)+'/'+s.slice(0,4);
+    return s;
+  }
+
+  function situacaoBadge(sit) {
+    const s = String(sit ?? '').toLowerCase();
+    if (!sit)                return '<span class="badge badge-open">Em aberto</span>';
+    if (s.includes('receb') || s === '2') return '<span class="badge badge-done">Recebido</span>';
+    if (s.includes('cancel'))             return '<span class="badge badge-cancel">Cancelado</span>';
+    if (s === '1' || s.includes('emit'))  return '<span class="badge badge-open">Emitido</span>';
+    return `<span class="badge badge-open">${sit}</span>`;
+  }
+
+  function renderResults(data) {
+    const manifests = data.manifests || [];
+    _ultimoResultado = manifests;
+    const wrap = document.getElementById('consulta-results');
+    const tbody = document.getElementById('results-tbody');
+    const count = document.getElementById('results-count');
+
+    if (!manifests.length) {
+      wrap.style.display = 'none';
+      showResponse('resp-consulta', '⚠ Nenhum MTR encontrado no período informado.', false);
+      return;
+    }
+
+    count.textContent = `${manifests.length} MTR(s) encontrado(s)`;
+    tbody.innerHTML = manifests.map(m => {
+      const codigo     = m.manifestoCodigo ?? m.codigo ?? '—';
+      const dataEmis   = formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao);
+      const cnpjGer    = m.cnpGerador   ?? m.cnpjGerador   ?? '—';
+      const nomeGer    = m.nomeGerador  ?? m.razaoGerador  ?? '—';
+      const cnpjTransp = m.cnpTransportador  ?? m.cnpjTransportador  ?? '—';
+      const nomeTransp = m.nomeTransportador ?? m.razaoTransportador ?? '—';
+      const situacao   = situacaoBadge(m.situacao ?? m.manifSituacao ?? m.status);
+      return `<tr>
+        <td><strong>${codigo}</strong></td>
+        <td>${dataEmis}</td>
+        <td style="font-family:monospace">${cnpjGer}</td>
+        <td>${nomeGer}</td>
+        <td style="font-family:monospace">${cnpjTransp}</td>
+        <td>${nomeTransp}</td>
+        <td>${situacao}</td>
+      </tr>`;
+    }).join('');
+
+    wrap.style.display = 'block';
+    document.getElementById('resp-consulta').className = 'response-box';
+  }
+
+  function exportarCSV() {
+    if (!_ultimoResultado.length) return;
+    const headers = ['Nº MTR','Data Emissão','CNPJ Gerador','Nome Gerador','CNPJ Transportador','Nome Transportador','Situação'];
+    const rows = _ultimoResultado.map(m => [
+      m.manifestoCodigo ?? m.codigo ?? '',
+      formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
+      m.cnpGerador   ?? m.cnpjGerador   ?? '',
+      m.nomeGerador  ?? m.razaoGerador  ?? '',
+      m.cnpTransportador  ?? m.cnpjTransportador  ?? '',
+      m.nomeTransportador ?? m.razaoTransportador ?? '',
+      (() => { const s = m.situacao ?? m.manifSituacao ?? m.status; return !s ? 'Em aberto' : s; })()
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`));
+    const csv = [headers.map(h=>`"${h}"`), ...rows].map(r=>r.join(';')).join('\n');
+    const blob = new Blob(['\ufeff'+csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+    a.href = url; a.download = `MTRs_pendentes_${hoje}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function submitConsulta() {
+    const inicio = document.getElementById('c-dataInicio').value;
+    const fim    = document.getElementById('c-dataFim').value;
+    if (!inicio || !fim) {
+      showResponse('resp-consulta', '❌ Informe Data Início e Data Fim.', true); return;
+    }
+    if (inicio > fim) {
+      showResponse('resp-consulta', '❌ Data Início deve ser anterior à Data Fim.', true); return;
+    }
+    if (WEBHOOK_CONSULTA.startsWith('COLE_AQUI')) {
+      showResponse('resp-consulta', '❌ Configure o WEBHOOK_CONSULTA no topo do script após importar o workflow 3 no n8n.', true); return;
+    }
+
+    const btn = document.getElementById('btn-consulta');
+    btn.disabled = true; btn.textContent = 'Buscando…';
+    document.getElementById('consulta-results').style.display = 'none';
+    document.getElementById('resp-consulta').className = 'response-box';
+
+    try {
+      const res = await fetch(WEBHOOK_CONSULTA, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fim) })
+      });
+      const ct = res.headers.get('content-type') || '';
+      const body = ct.includes('json') ? await res.json() : await res.text();
+      if (typeof body === 'string') {
+        showResponse('resp-consulta', body, body.includes('❌'));
+      } else {
+        renderResults(body);
+        if (body.mensagem) showResponse('resp-consulta', body.mensagem, body.mensagem.includes('❌'));
+      }
+    } catch (err) {
+      showResponse('resp-consulta', '❌ ' + (err.message || 'Falha na requisição'), true);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Buscar MTRs';
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // ── Replicar último MTR ──────────────────────────────────────────────────────
   function saveLastMTR() {
