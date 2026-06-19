@@ -1460,6 +1460,14 @@
     return isoDate.replace(/-/g, '');
   }
 
+  function fimMaisUm(isoDate) {
+    // A API usa dataFim exclusivo (retorna < dataFim), então somamos 1 dia
+    // para que o dia escolhido pelo usuário seja incluído nos resultados
+    const d = new Date(isoDate + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
   function formatDate(apiDate) {
     if (!apiDate) return '—';
     const s = String(apiDate);
@@ -1594,7 +1602,7 @@
       const res = await fetch(WEBHOOK_CONSULTA, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fim) })
+        body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fimMaisUm(fim)) })
       });
       const ct = res.headers.get('content-type') || '';
       const body = ct.includes('json') ? await res.json() : await res.text();
