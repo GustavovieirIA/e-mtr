@@ -609,9 +609,7 @@
                 <th>Nº MTR</th>
                 <th>Data Emissão</th>
                 <th>CNPJ Gerador</th>
-                <th>Nome Gerador</th>
                 <th>CNPJ Transportador</th>
-                <th>Nome Transportador</th>
                 <th>Situação</th>
               </tr>
             </thead>
@@ -963,11 +961,16 @@
   }
 
   function situacaoBadge(sit) {
+    const code = Number(sit);
+    if (code === 1) return '<span class="badge badge-open">Emitido (aguarda baixa)</span>';
+    if (code === 3) return '<span class="badge badge-done">Recebido</span>';
+    if (code === 4) return '<span class="badge badge-cancel">Cancelado</span>';
+    if (code === 9) return '<span class="badge badge-open">Armazenamento Temp.</span>';
     const s = String(sit ?? '').toLowerCase();
     if (!sit)                return '<span class="badge badge-open">Em aberto</span>';
-    if (s.includes('receb') || s === '2') return '<span class="badge badge-done">Recebido</span>';
-    if (s.includes('cancel'))             return '<span class="badge badge-cancel">Cancelado</span>';
-    if (s === '1' || s.includes('emit'))  return '<span class="badge badge-open">Emitido</span>';
+    if (s.includes('receb')) return '<span class="badge badge-done">Recebido</span>';
+    if (s.includes('cancel')) return '<span class="badge badge-cancel">Cancelado</span>';
+    if (s.includes('emit') || s.includes('aguard')) return '<span class="badge badge-open">Emitido (aguarda baixa)</span>';
     return `<span class="badge badge-open">${sit}</span>`;
   }
 
@@ -989,17 +992,13 @@
       const codigo     = m.manifestoCodigo ?? m.codigo ?? '—';
       const dataEmis   = formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao);
       const cnpjGer    = m.cnpGerador   ?? m.cnpjGerador   ?? '—';
-      const nomeGer    = m.nomeGerador  ?? m.razaoGerador  ?? '—';
-      const cnpjTransp = m.cnpTransportador  ?? m.cnpjTransportador  ?? '—';
-      const nomeTransp = m.nomeTransportador ?? m.razaoTransportador ?? '—';
-      const situacao   = situacaoBadge(m.situacao ?? m.manifSituacao ?? m.status);
+      const cnpjTransp = m.cnpTransportador ?? m.cnpjTransportador ?? '—';
+      const situacao   = situacaoBadge(m.situacaoManifestoCodigo ?? m.situacao ?? m.manifSituacao ?? m.status);
       return `<tr>
         <td><strong>${codigo}</strong></td>
         <td>${dataEmis}</td>
         <td style="font-family:monospace">${cnpjGer}</td>
-        <td>${nomeGer}</td>
         <td style="font-family:monospace">${cnpjTransp}</td>
-        <td>${nomeTransp}</td>
         <td>${situacao}</td>
       </tr>`;
     }).join('');
@@ -1010,15 +1009,13 @@
 
   function exportarCSV() {
     if (!_ultimoResultado.length) return;
-    const headers = ['Nº MTR','Data Emissão','CNPJ Gerador','Nome Gerador','CNPJ Transportador','Nome Transportador','Situação'];
+    const headers = ['Nº MTR','Data Emissão','CNPJ Gerador','CNPJ Transportador','Situação'];
     const rows = _ultimoResultado.map(m => [
       m.manifestoCodigo ?? m.codigo ?? '',
       formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
-      m.cnpGerador   ?? m.cnpjGerador   ?? '',
-      m.nomeGerador  ?? m.razaoGerador  ?? '',
-      m.cnpTransportador  ?? m.cnpjTransportador  ?? '',
-      m.nomeTransportador ?? m.razaoTransportador ?? '',
-      (() => { const s = m.situacao ?? m.manifSituacao ?? m.status; return !s ? 'Em aberto' : s; })()
+      m.cnpGerador  ?? m.cnpjGerador  ?? '',
+      m.cnpTransportador ?? m.cnpjTransportador ?? '',
+      m.situacao ?? (m.situacaoManifestoCodigo === 1 ? 'Emitido (aguarda baixa)' : m.situacaoManifestoCodigo === 3 ? 'Recebido' : m.situacaoManifestoCodigo === 4 ? 'Cancelado' : 'Em aberto')
     ].map(v => `"${String(v).replace(/"/g,'""')}"`));
     const csv = [headers.map(h=>`"${h}"`), ...rows].map(r=>r.join(';')).join('\n');
     const blob = new Blob(['\ufeff'+csv], { type: 'text/csv;charset=utf-8;' });

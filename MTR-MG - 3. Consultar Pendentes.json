@@ -19,9 +19,7 @@
         "url": "https://mtr.meioambiente.mg.gov.br/api/gettoken",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            { "name": "Content-Type", "value": "application/json" }
-          ]
+          "parameters": [{ "name": "Content-Type", "value": "application/json" }]
         },
         "sendBody": true,
         "specifyBody": "json",
@@ -46,39 +44,48 @@
     },
     {
       "parameters": {
-        "jsCode": "const form = $('Consultar MTRs Webhook').first().json.body;\nconst auth = $input.first().json;\n\n// ⚠️ VERIFICAR: confirme o endpoint correto com a FEAM/MTR-MG\n// Candidatos: listarManifestos, consultarManifestos, listarManifestosParaReceber\nconst payload = {\n  cnpDestinador: '07711109000186',\n  codUnidadeDestinador: 255271,\n  dataInicio: form['dataInicio'],\n  dataFim: form['dataFim']\n};\n\nreturn [{ json: { payload, token: auth.token, chave: auth.chave } }];"
+        "method": "POST",
+        "url": "={{ 'https://mtr.meioambiente.mg.gov.br/api/retornaListaCodigoBarasManifesto/' + $('Consultar MTRs Webhook').first().json.body.dataInicio + '/' + $('Consultar MTRs Webhook').first().json.body.dataFim }}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Content-Type\": \"application/json\",\n  \"Authorization\": \"{{ 'Bearer ' + $json.token }}\",\n  \"chave_feam\": \"{{ $json.chave }}\"\n}",
+        "sendBody": false,
+        "options": {}
       },
       "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
-      "name": "Monta Payload Consulta",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "name": "Busca Barcodes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [720, 0]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://mtr.meioambiente.mg.gov.br/api/listarManifestos",
-        "sendHeaders": true,
-        "specifyHeaders": "json",
-        "jsonHeaders": "={\n  \"Content-Type\": \"application/json\",\n  \"Authorization\": \"{{ 'Bearer ' + $json.token }}\",\n  \"chave_feam\": \"{{ $json.chave }}\"\n}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.payload) }}",
-        "options": {}
+        "jsCode": "const resp = $input.first().json;\n\nif (resp.retornoCodigo !== undefined && resp.retornoCodigo !== 0) {\n  return [{ json: {\n    _done: true, sucesso: false, total: 0, totalPendentes: 0, manifests: [],\n    mensagem: `❌ Erro ${resp.retornoCodigo}: ${resp.retorno}`\n  } }];\n}\n\n// Barcode: [10 nº manifesto][8 cód gerador][8 cód transportador][8 cód destinador]\n// Nosso codUnidadeDestinador = 255271 → padded 8 dígitos = '00255271'\nconst MEU_COD = '00255271';\nconst codigos = resp.codigos || [];\nconst auth = $('Extrai Token').first().json;\n\nconst filtrados = codigos.filter(b => b.length >= 34 && b.substring(26, 34) === MEU_COD);\n\nif (filtrados.length === 0) {\n  return [{ json: {\n    _done: true, sucesso: true, total: 0, totalPendentes: 0, manifests: [],\n    mensagem: `✅ 0 MTR(s) pendente(s) como destinador no período (${codigos.length} manifesto(s) no total)`\n  } }];\n}\n\nreturn filtrados.map(barcode => ({ json: { barcode, token: auth.token, chave: auth.chave } }));"
       },
       "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
-      "name": "Consulta MTRs",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "name": "Filtra Destinador",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [960, 0]
     },
     {
       "parameters": {
-        "jsCode": "const resp = $input.first().json;\n\n// Erro geral da API\nif (resp.retornoCodigo !== undefined && resp.retornoCodigo !== 0) {\n  return [{ json: {\n    sucesso: false,\n    total: 0,\n    manifests: [],\n    mensagem: `❌ Erro ${resp.retornoCodigo}: ${resp.retorno}`\n  }}];\n}\n\n// Normaliza: a API pode retornar array direto ou dentro de uma chave\nconst lista = Array.isArray(resp)\n  ? resp\n  : (resp.manifestoJSONDtos || resp.manifests || resp.data || []);\n\nconst pendentes = lista.filter(m => {\n  // Filtra apenas os que ainda não têm baixa (ajuste o campo conforme a API retornar)\n  const situacao = m.situacao ?? m.manifSituacao ?? m.status ?? null;\n  // null/undefined = assumir pendente; 1 = emitido sem baixa (ajuste se necessário)\n  return situacao === null || situacao === undefined || situacao === 1 || situacao === '1';\n});\n\nreturn [{ json: {\n  sucesso: true,\n  total: lista.length,\n  totalPendentes: pendentes.length,\n  manifests: lista,\n  mensagem: `✅ ${lista.length} MTR(s) encontrado(s), ${pendentes.length} pendente(s) de baixa`\n} }];"
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "check-done",
+              "leftValue": "={{ $json._done }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
       },
       "id": "f6a7b8c9-d0e1-2345-fabc-456789012345",
-      "name": "Processa Resposta",
-      "type": "n8n-nodes-base.code",
+      "name": "Tem Barcodes",
+      "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [1200, 0]
     },
@@ -89,10 +96,48 @@
         "options": {}
       },
       "id": "a7b8c9d0-e1f2-3456-abcd-567890123456",
+      "name": "Retorna Vazio",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1440, -120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://mtr.meioambiente.mg.gov.br/api/retornaManifesto/' + $json.barcode }}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"Content-Type\": \"application/json\",\n  \"Authorization\": \"{{ 'Bearer ' + $json.token }}\",\n  \"chave_feam\": \"{{ $json.chave }}\"\n}",
+        "sendBody": false,
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4567-bcde-678901234567",
+      "name": "Busca Manifesto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst todos = items.map(i => i.json).filter(m => m.manifestoCodigo !== undefined);\n\nconst SITUACOES = {\n  1: 'Emitido (aguarda baixa)',\n  3: 'Recebido',\n  4: 'Cancelado',\n  9: 'Armazenamento Temp.'\n};\n\n// Filtra apenas os pendentes de baixa (situação 1 = Salvo/Emitido)\nconst pendentes = todos.filter(m => m.situacaoManifestoCodigo === 1);\n\nconst result = pendentes.map(m => ({\n  manifestoCodigo: m.manifestoCodigo,\n  manifDataExpedicao: m.manifDataExpedicao || m.manifData,\n  cnpGerador: m.cnpGerador,\n  cnpTransportador: m.cnpTransportador,\n  situacaoManifestoCodigo: m.situacaoManifestoCodigo,\n  situacao: SITUACOES[m.situacaoManifestoCodigo] || `Situação ${m.situacaoManifestoCodigo}`\n}));\n\nreturn [{ json: {\n  sucesso: true,\n  total: todos.length,\n  totalPendentes: result.length,\n  manifests: result,\n  mensagem: `✅ ${result.length} MTR(s) pendente(s) de baixa (de ${todos.length} como destinador no período)`\n} }];"
+      },
+      "id": "c9d0e1f2-a3b4-5678-cdef-789012345678",
+      "name": "Agrega Pendentes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 120]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-6789-defa-890123456789",
       "name": "Retorna Resultado",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1440, 0]
+      "position": [1920, 120]
     }
   ],
   "connections": {
@@ -103,15 +148,24 @@
       "main": [[{ "node": "Extrai Token", "type": "main", "index": 0 }]]
     },
     "Extrai Token": {
-      "main": [[{ "node": "Monta Payload Consulta", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Busca Barcodes", "type": "main", "index": 0 }]]
     },
-    "Monta Payload Consulta": {
-      "main": [[{ "node": "Consulta MTRs", "type": "main", "index": 0 }]]
+    "Busca Barcodes": {
+      "main": [[{ "node": "Filtra Destinador", "type": "main", "index": 0 }]]
     },
-    "Consulta MTRs": {
-      "main": [[{ "node": "Processa Resposta", "type": "main", "index": 0 }]]
+    "Filtra Destinador": {
+      "main": [[{ "node": "Tem Barcodes", "type": "main", "index": 0 }]]
     },
-    "Processa Resposta": {
+    "Tem Barcodes": {
+      "main": [
+        [{ "node": "Retorna Vazio",    "type": "main", "index": 0 }],
+        [{ "node": "Busca Manifesto",  "type": "main", "index": 0 }]
+      ]
+    },
+    "Busca Manifesto": {
+      "main": [[{ "node": "Agrega Pendentes", "type": "main", "index": 0 }]]
+    },
+    "Agrega Pendentes": {
       "main": [[{ "node": "Retorna Resultado", "type": "main", "index": 0 }]]
     }
   },
