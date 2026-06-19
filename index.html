@@ -1541,42 +1541,56 @@
   function exportarCSV() {
     if (!_ultimoResultado.length) return;
 
-    // Colunas fixas — mesma estrutura aceita pelo upload de baixa em massa
+    const UNIT_MAP = { 1: 'm³', 2: 'L', 3: 'kg', 4: 't', 5: 'Un' };
+    const hoje     = new Date().toLocaleDateString('pt-BR'); // dd/mm/yyyy
+    const q        = v => `"${String(v ?? '').replace(/"/g, '""')}"`;  // força texto
+
+    // Colunas — mesma estrutura do parser de upload de baixa em massa
     const headers = [
-      'Nº MTR', 'Data Emissão', 'CNPJ Gerador', 'CNPJ Transportador',
+      'Nº MTR', 'Data Emissão', 'CNPJ Gerador', 'Nome Gerador',
+      'CNPJ Transportador', 'Nome Transportador',
       'Situação', 'Data de recebimento', 'Motorista', 'Placa',
-      'Responsável pelo recebimento', 'Cargo', 'Tecnologia', 'Qt. Recebida', 'Justificativa'
+      'Responsável pelo recebimento', 'Cargo',
+      'Tecnologia', 'Qt. Recebida', 'Unidade',
+      'Justificativa', 'Resíduo', 'Cód. Estado Físico'
     ];
 
     const rows = _ultimoResultado.map(m => {
-      const cg        = m.cnpGerador      ?? '';
-      const ct        = m.cnpTransportador ?? '';
-      const firstItem = (m.itens || [])[0] || {};
+      const cg        = m.cnpGerador        ?? '';
+      const ct        = m.cnpTransportador   ?? '';
+      const nomeGer   = _nomeMap[cg]        || '';
+      const nomeTransp= _nomeMap[ct]        || '';
+      const fi        = (m.itens || [])[0]  || {};
+      const motorista = (m.nomeMotorista && m.nomeMotorista.trim()) ? m.nomeMotorista.trim() : 'Claudio';
+      const unidade   = UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '');
       return [
-        m.manifestoCodigo ?? '',
-        formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
-        cg,
-        ct,
-        m.situacao ?? 'Emitido (aguarda baixa)',
-        '',                                       // Data de recebimento — operador preenche
-        (m.nomeMotorista && m.nomeMotorista.trim()) ? m.nomeMotorista.trim() : 'Claudio',
-        m.placaVeiculo ?? '',
-        'Victoria Abrahão',
-        'Analista ambiental',
-        firstItem.codigoTecnologia ?? '',
-        firstItem.quantidade       ?? '',
-        'Peso apurado em balança',
-        firstItem.residuo          ?? '',
-        firstItem.codigoTipoEstado ?? ''
-      ].map(v => `"${String(v).replace(/"/g, '""')}"`);
+        m.manifestoCodigo ?? '',            // Nº MTR — numérico
+        q(formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao)),
+        cg,                                 // CNPJ Gerador — numérico (sem aspas)
+        q(nomeGer),
+        ct,                                 // CNPJ Transportador — numérico
+        q(nomeTransp),
+        q(m.situacao ?? 'Emitido (aguarda baixa)'),
+        q(hoje),                            // Data de recebimento — hoje, operador edita
+        q(motorista),
+        q(m.placaVeiculo ?? ''),
+        q('Victoria Abrahão'),
+        q('Analista ambiental'),
+        fi.codigoTecnologia ?? '',          // Tecnologia — numérico
+        fi.quantidade       ?? '',          // Qt. Recebida — numérico
+        q(unidade),
+        q('Peso apurado em balança'),
+        q(fi.residuo        ?? ''),
+        fi.codigoTipoEstado ?? ''           // Cód. Estado Físico — numérico
+      ].join(';');
     });
 
-    const csv  = [headers.map(h => `"${h}"`), ...rows].map(r => r.join(';')).join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const csv  = [headers.map(q).join(';'), ...rows].join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
-    a.href = url; a.download = `MTRs_pendentes_${hoje}.csv`; a.click();
+    const data = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+    a.href = url; a.download = `MTRs_pendentes_${data}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
