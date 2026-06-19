@@ -1403,7 +1403,7 @@
         'Observações do Recebimento':            r['Justificativa']             || '',
         'Nome do Motorista':                     r['Motorista']                 || '',
         'Placa do Veículo':                      r['Placa']                     || '',
-        'Quantidade Recebida':                   r['Qt. Recebida']              || '',
+        'Quantidade Recebida':                   r['Qt. Recebida'] || r['Qt. Indicada'] || '',
         'Código do Resíduo (IBAMA)':             r['Resíduo']                   || '',
         'Código de Tecnologia':                  r['Tecnologia']                || '',
         'Código de Estado Físico':               r['Cód. Estado Físico']        || ''
@@ -1555,46 +1555,56 @@
     if (!_ultimoResultado.length) return;
 
     const UNIT_MAP = { 1: 'm³', 2: 'L', 3: 'kg', 4: 't', 5: 'Un' };
-    const hoje     = new Date().toLocaleDateString('pt-BR'); // dd/mm/yyyy
-    const q        = v => `"${String(v ?? '').replace(/"/g, '""')}"`;  // força texto
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-    // Colunas — mesma estrutura do parser de upload de baixa em massa
+    // ┌─ Identificação ────────────────────────────────────────────────────────┐
+    // │ Nº MTR | Data Emissão | CNPJ Ger | Nome Ger | CNPJ Transp | Nome Transp | Situação │
+    // ├─ Preencher / Conferir (colunas adjacentes) ─────────────────────────────┤
+    // │ Data Receb | Motorista | Placa | Responsável | Cargo │
+    // │ Qt. Indicada | Qt. Recebida | Unidade | Tecnologia | Justificativa │
+    // ├─ Técnico (sistema) ─────────────────────────────────────────────────────┤
+    // │ Resíduo | Cód. Estado Físico │
+    // └────────────────────────────────────────────────────────────────────────┘
     const headers = [
       'Nº MTR', 'Data Emissão', 'CNPJ Gerador', 'Nome Gerador',
-      'CNPJ Transportador', 'Nome Transportador',
-      'Situação', 'Data de recebimento', 'Motorista', 'Placa',
+      'CNPJ Transportador', 'Nome Transportador', 'Situação',
+      'Data de recebimento', 'Motorista', 'Placa',
       'Responsável pelo recebimento', 'Cargo',
-      'Tecnologia', 'Qt. Recebida', 'Unidade',
-      'Justificativa', 'Resíduo', 'Cód. Estado Físico'
+      'Qt. Indicada', 'Qt. Recebida', 'Unidade', 'Tecnologia', 'Justificativa',
+      'Resíduo', 'Cód. Estado Físico'
     ];
 
     const rows = _ultimoResultado.map(m => {
-      const cg        = m.cnpGerador        ?? '';
-      const ct        = m.cnpTransportador   ?? '';
-      const nomeGer   = _nomeMap[cg]        || '';
-      const nomeTransp= _nomeMap[ct]        || '';
-      const fi        = (m.itens || [])[0]  || {};
-      const motorista = (m.nomeMotorista && m.nomeMotorista.trim()) ? m.nomeMotorista.trim() : 'Claudio';
-      const unidade   = UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '');
+      const cg         = m.cnpGerador       ?? '';
+      const ct         = m.cnpTransportador  ?? '';
+      const nomeGer    = _nomeMap[cg]       || '';
+      const nomeTransp = _nomeMap[ct]       || '';
+      const fi         = (m.itens || [])[0] || {};
+      const motorista  = (m.nomeMotorista?.trim()) || 'Claudio';
+      const unidade    = UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '');
       return [
-        m.manifestoCodigo ?? '',            // Nº MTR — numérico
+        // ── Identificação (somente leitura) ──────────────────────────────────
+        m.manifestoCodigo ?? '',
         q(formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao)),
-        cg,                                 // CNPJ Gerador — numérico (sem aspas)
+        cg,
         q(nomeGer),
-        ct,                                 // CNPJ Transportador — numérico
+        ct,
         q(nomeTransp),
         q(m.situacao ?? 'Emitido (aguarda baixa)'),
-        q(hoje),                            // Data de recebimento — hoje, operador edita
+        // ── Preencher / Conferir ─────────────────────────────────────────────
+        q(''),                          // Data de recebimento — operador preenche
         q(motorista),
         q(m.placaVeiculo ?? ''),
         q('Victoria Abrahão'),
         q('Analista ambiental'),
-        fi.codigoTecnologia ?? '',          // Tecnologia — numérico
-        fi.quantidade       ?? '',          // Qt. Recebida — numérico
+        fi.quantidade       ?? '',      // Qt. Indicada — vem do sistema
+        q(''),                          // Qt. Recebida  — operador preenche
         q(unidade),
+        fi.codigoTecnologia ?? '',
         q('Peso apurado em balança'),
+        // ── Técnico ──────────────────────────────────────────────────────────
         q(fi.residuo        ?? ''),
-        fi.codigoTipoEstado ?? ''           // Cód. Estado Físico — numérico
+        fi.codigoTipoEstado ?? ''
       ].join(';');
     });
 
