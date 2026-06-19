@@ -419,6 +419,43 @@
       .modal-fields { grid-template-columns: 1fr; }
       .modal-info-grid { grid-template-columns: 1fr; }
     }
+
+    /* ── Baixa em Massa ──────────────────────────────────────────────── */
+    .massa-section { margin-top: 32px; padding-top: 24px; border-top: 2px dashed #e8ecf0; }
+    .upload-area {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      border: 2px dashed #cbd5e0; border-radius: 8px;
+      padding: 28px 20px; text-align: center; cursor: pointer;
+      color: #718096; font-size: .9rem;
+      transition: border-color .15s, background .15s; margin-bottom: 14px;
+    }
+    .upload-area:hover, .upload-area.drag-over {
+      border-color: #1a5276; background: #f0f4f8; color: #1a5276;
+    }
+    .upload-area small { font-size: .75rem; color: #a0aec0; }
+    .btn-massa {
+      padding: 8px 20px; background: #1a5276; color: #fff;
+      border: none; border-radius: 5px; font-size: .85rem;
+      font-weight: 700; cursor: pointer; transition: background .15s;
+    }
+    .btn-massa:hover:not(:disabled) { background: #154360; }
+    .btn-massa:disabled { opacity: .6; cursor: not-allowed; }
+    .massa-table-wrap {
+      overflow-x: auto; border-radius: 6px; border: 1px solid #e8ecf0;
+      max-height: 340px; overflow-y: auto;
+    }
+    .massa-progress-bar {
+      height: 10px; background: #e8ecf0; border-radius: 5px;
+      margin-top: 14px; overflow: hidden;
+    }
+    .massa-progress-fill {
+      height: 100%; background: linear-gradient(90deg,#1a5276,#2980b9);
+      width: 0%; transition: width .25s; border-radius: 5px;
+    }
+    .status-wait { color: #a0aec0; font-size: .77rem; }
+    .status-ok   { color: #276221; font-weight: 700; font-size: .77rem; }
+    .status-err  { color: #c0392b; font-weight: 600; font-size: .77rem; }
+    .status-skip { color: #e67e22; font-size: .77rem; }
   </style>
 </head>
 <body>
@@ -655,6 +692,57 @@
         <span class="btn-text" data-label="Dar Baixa no MTR"></span>
       </button>
       <div class="response-box" id="resp-baixa"></div>
+
+      <!-- ═══ Baixa em Massa ════════════════════════════════════════════════ -->
+      <div class="massa-section">
+        <p class="section-title">Baixa em Massa — Upload de Planilha</p>
+        <p style="font-size:.84rem;color:#718096;margin:0 0 14px">
+          Exporte a planilha na aba <strong>Consultar MTRs</strong>, preencha as datas,
+          verifique os dados e carregue o arquivo aqui.
+        </p>
+
+        <label class="upload-area" for="csv-massa-input" id="upload-label"
+               ondragover="event.preventDefault();this.classList.add('drag-over')"
+               ondragleave="this.classList.remove('drag-over')"
+               ondrop="event.preventDefault();this.classList.remove('drag-over');
+                       document.getElementById('csv-massa-input').files=event.dataTransfer.files;
+                       handleCSVUpload({target:document.getElementById('csv-massa-input')})">
+          <span id="upload-label-text">📂 Clique ou arraste o arquivo CSV aqui</span>
+          <small>Formato: CSV com ponto-e-vírgula (exportado pelo sistema)</small>
+          <input type="file" id="csv-massa-input" accept=".csv" style="display:none"
+                 onchange="handleCSVUpload(event)" />
+        </label>
+
+        <div id="massa-preview" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 10px">
+            <span id="massa-count" style="font-size:.84rem;color:#4a5568;font-weight:600"></span>
+            <div style="display:flex;gap:8px">
+              <button class="btn-modal-cancel" onclick="limparCSV()">Limpar</button>
+              <button class="btn-massa" id="btn-massa" onclick="processarBaixasMassa()">▶ Processar Baixas</button>
+            </div>
+          </div>
+          <div class="massa-table-wrap">
+            <table class="results-table" id="massa-preview-table">
+              <thead><tr>
+                <th>Nº MTR</th><th>Data Emissão</th>
+                <th>CNPJ Gerador</th><th>CNPJ Transportador</th>
+                <th>Data Recebimento</th><th>Motorista</th>
+                <th>Qt. Recebida</th><th>Status</th>
+              </tr></thead>
+              <tbody id="massa-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="massa-progress-wrap" style="display:none">
+          <div class="massa-progress-bar">
+            <div class="massa-progress-fill" id="massa-progress-fill"></div>
+          </div>
+          <p id="massa-progress-label"
+             style="font-size:.82rem;color:#4a5568;margin:8px 0 0;text-align:center"></p>
+        </div>
+      </div>
+
     </div>
 
 
@@ -1196,6 +1284,159 @@
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
+
+  // ── Baixa em Massa ────────────────────────────────────────────────────────
+  let _csvRows = [];
+
+  function _parseCSVLine(line) {
+    const result = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if (c === ';' && !inQ) { result.push(cur); cur = ''; }
+      else cur += c;
+    }
+    result.push(cur); return result;
+  }
+
+  function _parseCSV(text) {
+    text = text.replace(/^\uFEFF/, '').replace(/\r/g, '');
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const headers = _parseCSVLine(lines[0]).map(h => h.trim());
+    return lines.slice(1).map(line => {
+      const vals = _parseCSVLine(line);
+      const row = {};
+      headers.forEach((h, i) => row[h] = (vals[i] ?? '').trim());
+      return row;
+    });
+  }
+
+  function _csvDateToAPI(d) {
+    // dd/mm/yyyy → yyyymmdd; já em yyyymmdd → passa direto
+    const m1 = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m1) return `${m1[3]}${m1[2]}${m1[1]}`;
+    return d.replace(/\D/g, '').slice(0, 8);
+  }
+
+  function handleCSVUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    document.getElementById('upload-label-text').textContent = `📄 ${file.name}`;
+    const reader = new FileReader();
+    reader.onload = e => {
+      _csvRows = _parseCSV(e.target.result);
+      if (!_csvRows.length) { alert('CSV vazio ou inválido.'); return; }
+      _renderCSVPreview();
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  function _renderCSVPreview() {
+    const tbody = document.getElementById('massa-preview-tbody');
+    tbody.innerHTML = _csvRows.map((r, i) => {
+      const semData = !r['Data de recebimento']?.trim();
+      return `<tr id="massa-row-${i}">
+        <td><strong>${r['Nº MTR'] || '—'}</strong></td>
+        <td>${r['Data Emissão'] || '—'}</td>
+        <td style="font-family:monospace;font-size:.76rem">${r['CNPJ Gerador'] || '—'}</td>
+        <td style="font-family:monospace;font-size:.76rem">${r['CNPJ Transportador'] || '—'}</td>
+        <td>${semData ? '<span style="color:#c0392b;font-size:.78rem">⚠ vazia</span>' : r['Data de recebimento']}</td>
+        <td style="font-size:.8rem">${r['Motorista'] || '—'}</td>
+        <td style="text-align:right">${r['Qt. Recebida'] || '—'}</td>
+        <td class="status-wait" id="massa-status-${i}">Aguardando</td>
+      </tr>`;
+    }).join('');
+    const total   = _csvRows.length;
+    const semData = _csvRows.filter(r => !r['Data de recebimento']?.trim()).length;
+    document.getElementById('massa-count').textContent =
+      `${total} registro(s)` + (semData ? ` — ⚠ ${semData} sem data` : '');
+    document.getElementById('massa-preview').style.display = 'block';
+    document.getElementById('massa-progress-wrap').style.display = 'none';
+    document.getElementById('btn-massa').disabled = false;
+    document.getElementById('btn-massa').textContent = '▶ Processar Baixas';
+  }
+
+  function limparCSV() {
+    _csvRows = [];
+    document.getElementById('csv-massa-input').value = '';
+    document.getElementById('upload-label-text').textContent = '📂 Clique ou arraste o arquivo CSV aqui';
+    document.getElementById('massa-preview').style.display = 'none';
+    document.getElementById('massa-progress-wrap').style.display = 'none';
+  }
+
+  async function processarBaixasMassa() {
+    const rows = _csvRows.filter(r => r['Nº MTR']?.trim());
+    if (!rows.length) return;
+    const semData = rows.filter(r => !r['Data de recebimento']?.trim()).length;
+    if (semData && !confirm(`${semData} linha(s) sem Data de Recebimento serão puladas. Continuar?`)) return;
+
+    const btn = document.getElementById('btn-massa');
+    btn.disabled = true; btn.textContent = 'Processando…';
+    document.getElementById('massa-progress-wrap').style.display = 'block';
+    const fill  = document.getElementById('massa-progress-fill');
+    const label = document.getElementById('massa-progress-label');
+
+    let ok = 0, err = 0, skip = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const rowIdx   = _csvRows.indexOf(r);
+      const statusEl = document.getElementById(`massa-status-${rowIdx}`);
+      fill.style.width = Math.round((i / rows.length) * 100) + '%';
+      label.textContent = `${i}/${rows.length} — ✅ ${ok}  ❌ ${err}  ⏭ ${skip}`;
+
+      if (!r['Data de recebimento']?.trim()) {
+        if (statusEl) { statusEl.className = 'status-skip'; statusEl.textContent = '⏭ Pulado (sem data)'; }
+        skip++; continue;
+      }
+
+      if (statusEl) { statusEl.className = 'status-wait'; statusEl.textContent = '⏳ Enviando…'; }
+
+      const payload = {
+        'Número do Manifesto (10 dígitos)':     r['Nº MTR'],
+        'CNPJ do Gerador':                       r['CNPJ Gerador']             || '',
+        'CNPJ do Transportador':                 r['CNPJ Transportador']        || '',
+        'Nome do Responsável pelo Recebimento':  r['Responsável pelo recebimento'] || '',
+        'Cargo do Responsável':                  r['Cargo']                     || '',
+        'Data de Recebimento (AAAAMMDD)':        _csvDateToAPI(r['Data de recebimento']),
+        'Observações do Recebimento':            r['Justificativa']             || '',
+        'Nome do Motorista':                     r['Motorista']                 || '',
+        'Placa do Veículo':                      r['Placa']                     || '',
+        'Quantidade Recebida':                   r['Qt. Recebida']              || '',
+        'Código do Resíduo (IBAMA)':             r['Resíduo']                   || '',
+        'Código de Tecnologia':                  r['Tecnologia']                || '',
+        'Código de Estado Físico':               r['Cód. Estado Físico']        || ''
+      };
+
+      try {
+        const res  = await fetch(WEBHOOK_BAIXA, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const ct   = res.headers.get('content-type') || '';
+        const body = ct.includes('json') ? await res.json() : await res.text();
+        const msg  = typeof body === 'string' ? body.trim() : (body.mensagem || JSON.stringify(body));
+        const isOk = !msg.includes('❌');
+        if (statusEl) {
+          statusEl.className   = isOk ? 'status-ok' : 'status-err';
+          statusEl.textContent = isOk ? '✅ OK' : `❌ ${msg.slice(0, 80)}`;
+        }
+        if (isOk) ok++; else err++;
+      } catch(e) {
+        if (statusEl) { statusEl.className = 'status-err'; statusEl.textContent = `❌ ${e.message}`; }
+        err++;
+      }
+    }
+
+    fill.style.width = '100%';
+    label.textContent =
+      `Concluído — ✅ ${ok} sucesso   ❌ ${err} erro${err !== 1 ? 's' : ''}   ⏭ ${skip} pulado${skip !== 1 ? 's' : ''}`;
+    btn.disabled = false; btn.textContent = '▶ Processar Baixas';
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // ── Consultar MTRs ───────────────────────────────────────────────────────────
   let _ultimoResultado = [];
   let _nomeMap = {};
@@ -1316,7 +1557,9 @@
         'Analista ambiental',
         firstItem.codigoTecnologia ?? '',
         firstItem.quantidade       ?? '',
-        'Peso apurado em balança'
+        'Peso apurado em balança',
+        firstItem.residuo          ?? '',
+        firstItem.codigoTipoEstado ?? ''
       ].map(v => `"${String(v).replace(/"/g, '""')}"`);
     });
 
