@@ -1442,16 +1442,26 @@
   let _nomeMap = {};
 
   async function fetchNomeCNPJ(cnpj) {
-    if (!cnpj || cnpj === '—') return '—';
+    if (!cnpj || cnpj === '—') return '';
+    const digits = String(cnpj).replace(/\D/g, '');
+    if (digits.length !== 14) return (_nomeMap[cnpj] = '');  // CPF ou código inválido
     if (_nomeMap[cnpj] !== undefined) return _nomeMap[cnpj];
-    try {
-      const r = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + cnpj);
-      if (!r.ok) return (_nomeMap[cnpj] = cnpj);
+    const _try = async () => {
+      const r = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + digits);
+      if (r.status === 429) return null;  // rate limit — vai retentar
+      if (!r.ok) return '';               // 404 ou outro erro — sem nome
       const d = await r.json();
-      const nome = (d.nome_fantasia && d.nome_fantasia.trim()) ? d.nome_fantasia.trim() : (d.razao_social || cnpj);
-      return (_nomeMap[cnpj] = nome);
+      return (d.nome_fantasia?.trim()) || d.razao_social || '';
+    };
+    try {
+      let nome = await _try();
+      if (nome === null) {                // rate limit: aguarda e retenta
+        await new Promise(r => setTimeout(r, 1500));
+        nome = await _try() ?? '';
+      }
+      return (_nomeMap[cnpj] = nome || '');
     } catch {
-      return (_nomeMap[cnpj] = cnpj);
+      return (_nomeMap[cnpj] = '');
     }
   }
 
@@ -1507,9 +1517,12 @@
     wrap.style.display = 'block';
     document.getElementById('resp-consulta').className = 'response-box';
 
-    // Busca nomes de todas as empresas únicas em paralelo
+    // Busca nomes em lotes de 4 com pausa entre eles (evita rate limit da BrasilAPI)
     const cnpjs = [...new Set(manifests.flatMap(m => [m.cnpGerador, m.cnpTransportador].filter(Boolean)))];
-    await Promise.all(cnpjs.map(fetchNomeCNPJ));
+    for (let i = 0; i < cnpjs.length; i += 4) {
+      await Promise.all(cnpjs.slice(i, i + 4).map(fetchNomeCNPJ));
+      if (i + 4 < cnpjs.length) await new Promise(r => setTimeout(r, 600));
+    }
 
     count.textContent = `${manifests.length} MTR(s) encontrado(s)`;
     tbody.innerHTML = manifests.map(m => {
