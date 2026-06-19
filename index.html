@@ -339,6 +339,86 @@
     @media (max-width: 560px) {
       .date-row { grid-template-columns: 1fr; }
     }
+
+    /* ── Modal de Baixa ──────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.45); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 10px;
+      width: min(680px, 96vw); max-height: 90vh;
+      overflow-y: auto; padding: 28px 28px 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+    .modal-title {
+      font-size: 1rem; font-weight: 700; color: #1a1a2e;
+      margin: 0 0 18px; padding-bottom: 12px;
+      border-bottom: 2px solid #e8ecf0;
+    }
+    .modal-info-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px 20px; margin-bottom: 16px;
+      font-size: .82rem;
+    }
+    .modal-info-grid span { color: #718096; }
+    .modal-info-grid strong { display: block; color: #1a1a2e; }
+    .modal-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 14px; }
+    .modal-fields .full { grid-column: 1 / -1; }
+    .modal-fields label { font-size: .78rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 3px; }
+    .modal-fields input, .modal-fields textarea, .modal-fields select {
+      width: 100%; padding: 7px 10px; border: 1px solid #cbd5e0;
+      border-radius: 5px; font-size: .85rem; color: #1a1a2e;
+      background: #f7f9fc; box-sizing: border-box;
+    }
+    .modal-fields input:focus, .modal-fields textarea:focus {
+      outline: none; border-color: #1a5276;
+      box-shadow: 0 0 0 3px rgba(26,82,118,.12); background: #fff;
+    }
+    .modal-section-title {
+      font-size: .78rem; font-weight: 700; color: #4a5568;
+      text-transform: uppercase; letter-spacing: .5px;
+      margin: 14px 0 8px;
+    }
+    .itens-table { width: 100%; border-collapse: collapse; font-size: .8rem; margin-bottom: 14px; }
+    .itens-table th {
+      background: #f0f4f8; color: #4a5568; font-size: .73rem;
+      font-weight: 700; padding: 6px 8px; text-align: left;
+    }
+    .itens-table td { padding: 6px 8px; border-bottom: 1px solid #e8ecf0; }
+    .itens-table input[type=number] {
+      width: 80px; padding: 4px 6px; border: 1px solid #cbd5e0;
+      border-radius: 4px; font-size: .82rem; text-align: right;
+    }
+    .modal-footer {
+      display: flex; gap: 10px; justify-content: flex-end;
+      padding-top: 14px; border-top: 1px solid #e8ecf0; margin-top: 4px;
+    }
+    .btn-modal-cancel {
+      padding: 8px 18px; border: 1px solid #cbd5e0;
+      background: #fff; color: #4a5568; border-radius: 5px;
+      font-size: .85rem; cursor: pointer;
+    }
+    .btn-modal-baixa {
+      padding: 8px 22px; background: #1a5276; color: #fff;
+      border: none; border-radius: 5px; font-size: .85rem;
+      font-weight: 700; cursor: pointer; transition: background .15s;
+    }
+    .btn-modal-baixa:hover:not(:disabled) { background: #154360; }
+    .btn-modal-baixa:disabled { opacity: .6; cursor: not-allowed; }
+    .modal-resp { margin-top: 10px; font-size: .85rem; }
+    .btn-baixa-row {
+      padding: 5px 12px; background: #1a5276; color: #fff;
+      border: none; border-radius: 4px; font-size: .76rem;
+      font-weight: 700; cursor: pointer; white-space: nowrap;
+    }
+    .btn-baixa-row:hover { background: #154360; }
+    @media (max-width: 560px) {
+      .modal-fields { grid-template-columns: 1fr; }
+      .modal-info-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -611,6 +691,7 @@
                 <th>Gerador</th>
                 <th>Transportador</th>
                 <th>Situação</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="results-tbody"></tbody>
@@ -621,6 +702,62 @@
     </div>
 
   </div><!-- /.card -->
+
+<!-- ===== Modal Dar Baixa ===== -->
+<div class="modal-overlay" id="modal-baixa">
+  <div class="modal-box">
+    <p class="modal-title">Dar Baixa — MTR <span id="m-codigo"></span></p>
+
+    <div class="modal-info-grid">
+      <div><span>Gerador</span><strong id="m-gerador"></strong></div>
+      <div><span>Transportador</span><strong id="m-transportador"></strong></div>
+    </div>
+
+    <div class="modal-fields">
+      <div>
+        <label>Data de Recebimento *</label>
+        <input type="date" id="m-dataReceb" />
+      </div>
+      <div>
+        <label>Nome do Responsável pelo Recebimento *</label>
+        <input type="text" id="m-responsavel" placeholder="Nome completo" />
+      </div>
+      <div>
+        <label>Cargo do Responsável *</label>
+        <input type="text" id="m-cargo" placeholder="Cargo / função" />
+      </div>
+      <div>
+        <label>Nome do Motorista</label>
+        <input type="text" id="m-motorista" />
+      </div>
+      <div>
+        <label>Placa do Veículo</label>
+        <input type="text" id="m-placa" />
+      </div>
+      <div class="full">
+        <label>Observações <span style="font-weight:400;color:#718096">opcional</span></label>
+        <textarea id="m-obs" rows="2" placeholder="Observações do recebimento…"></textarea>
+      </div>
+    </div>
+
+    <p class="modal-section-title">Resíduos</p>
+    <table class="itens-table">
+      <thead><tr>
+        <th>#</th><th>Resíduo</th><th>Qtd Emitida</th><th>Qtd Recebida</th>
+      </tr></thead>
+      <tbody id="m-itens"></tbody>
+    </table>
+
+    <div class="modal-resp" id="m-resp"></div>
+    <div class="modal-footer">
+      <button class="btn-modal-cancel" onclick="fecharBaixaModal()">Cancelar</button>
+      <button class="btn-modal-baixa" id="btn-confirmar-baixa" onclick="confirmarBaixaModal()">
+        Confirmar Baixa
+      </button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /.container -->
 
 <script>
@@ -945,6 +1082,120 @@
 
 
 
+
+  // ── Modal Dar Baixa Inline ────────────────────────────────────────────────────
+  let _baixaManifest = null;
+
+  function openBaixaModal(manifest) {
+    _baixaManifest = manifest;
+    const nome = cod => (_nomeMap[cod] ? `${_nomeMap[cod]} (${cod})` : cod) || '—';
+
+    document.getElementById('m-codigo').textContent      = manifest.manifestoCodigo;
+    document.getElementById('m-gerador').textContent     = nome(manifest.cnpGerador);
+    document.getElementById('m-transportador').textContent = nome(manifest.cnpTransportador);
+    document.getElementById('m-motorista').value         = manifest.nomeMotorista || '';
+    document.getElementById('m-placa').value             = manifest.placaVeiculo  || '';
+    document.getElementById('m-responsavel').value       = '';
+    document.getElementById('m-cargo').value             = '';
+    document.getElementById('m-obs').value               = '';
+    document.getElementById('m-resp').textContent        = '';
+    // Pré-preenche data com hoje
+    document.getElementById('m-dataReceb').value = new Date().toISOString().slice(0,10);
+
+    const tbody = document.getElementById('m-itens');
+    tbody.innerHTML = (manifest.itens || []).map((it, i) => `
+      <tr>
+        <td>${it.codigoSequencial}</td>
+        <td style="font-family:monospace">${it.residuo}</td>
+        <td style="text-align:right">${it.quantidade}</td>
+        <td><input type="number" step="any" min="0"
+          id="m-qtd-${i}" value="${it.quantidade}"
+          style="width:90px;text-align:right" /></td>
+      </tr>`).join('');
+
+    document.getElementById('btn-confirmar-baixa').disabled = false;
+    document.getElementById('modal-baixa').classList.add('open');
+  }
+
+  function fecharBaixaModal() {
+    document.getElementById('modal-baixa').classList.remove('open');
+    _baixaManifest = null;
+  }
+
+  async function confirmarBaixaModal() {
+    const m = _baixaManifest;
+    if (!m) return;
+
+    const dataReceb    = document.getElementById('m-dataReceb').value;
+    const responsavel  = document.getElementById('m-responsavel').value.trim();
+    const cargo        = document.getElementById('m-cargo').value.trim();
+    const motorista    = document.getElementById('m-motorista').value.trim();
+    const placa        = document.getElementById('m-placa').value.trim();
+    const obs          = document.getElementById('m-obs').value.trim();
+
+    if (!dataReceb)   { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe a Data de Recebimento.</span>'; return; }
+    if (!responsavel) { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe o Nome do Responsável.</span>'; return; }
+    if (!cargo)       { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe o Cargo do Responsável.</span>'; return; }
+
+    const itens = (m.itens || []).map((it, i) => ({
+      codigoSequencial: it.codigoSequencial,
+      qtdRecebida: parseFloat(document.getElementById('m-qtd-' + i).value) || it.quantidade,
+      residuo: it.residuo,
+      codigoTecnologia: it.codigoTecnologia,
+      codigoTipoEstado: it.codigoTipoEstado
+    }));
+
+    const payload = {
+      'Número do Manifesto (10 dígitos)': String(m.manifestoCodigo),
+      'CNPJ do Gerador':                  m.cnpGerador    || '',
+      'CNPJ do Transportador':            m.cnpTransportador || '',
+      'Nome do Responsável pelo Recebimento': responsavel,
+      'Cargo do Responsável':             cargo,
+      'Data de Recebimento (AAAAMMDD)':   dataReceb.replace(/-/g, ''),
+      'Observações do Recebimento':       obs,
+      'Nome do Motorista':                motorista,
+      'Placa do Veículo':                 placa,
+      // Mantém campos individuais para compatibilidade com o workflow atual
+      'Quantidade Recebida':              itens[0]?.qtdRecebida ?? '',
+      'Código do Resíduo (IBAMA)':        itens[0]?.residuo     ?? '',
+      'Código de Tecnologia':             itens[0]?.codigoTecnologia  ?? '',
+      'Código de Estado Físico':          itens[0]?.codigoTipoEstado  ?? '',
+      'itens': itens
+    };
+
+    const btn = document.getElementById('btn-confirmar-baixa');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    document.getElementById('m-resp').textContent = '';
+
+    try {
+      const res  = await fetch(WEBHOOK_BAIXA, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const ct   = res.headers.get('content-type') || '';
+      const body = ct.includes('json') ? await res.json() : await res.text();
+      const msg  = typeof body === 'string' ? body.trim() : (body.mensagem || JSON.stringify(body));
+      const ok   = !msg.includes('❌');
+      document.getElementById('m-resp').innerHTML =
+        `<span style="color:${ok ? '#276221' : '#c0392b'}">${msg}</span>`;
+      if (ok) {
+        // Remove a linha da tabela após baixa com sucesso
+        const row = document.querySelector(`tr[data-mtr="${m.manifestoCodigo}"]`);
+        if (row) row.remove();
+        const total = document.querySelectorAll('#results-tbody tr').length;
+        document.getElementById('results-count').textContent = `${total} MTR(s) encontrado(s)`;
+        setTimeout(fecharBaixaModal, 1800);
+      }
+    } catch(err) {
+      document.getElementById('m-resp').innerHTML =
+        `<span style="color:#c0392b">❌ ${err.message || 'Falha na requisição'}</span>`;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Confirmar Baixa';
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // ── Consultar MTRs ───────────────────────────────────────────────────────────
   let _ultimoResultado = [];
   let _nomeMap = {};
@@ -1020,7 +1271,8 @@
       const nomeGer    = _nomeMap[cnpjGer]    || cnpjGer;
       const nomeTransp = _nomeMap[cnpjTransp] || cnpjTransp;
       const situacao   = situacaoBadge(m.situacaoManifestoCodigo ?? m.situacao ?? m.manifSituacao ?? m.status);
-      return `<tr>
+      const mStr = JSON.stringify(m).replace(/'/g,"\\'").replace(/`/g,'\\`');
+      return `<tr data-mtr="${m.manifestoCodigo ?? m.codigo}">
         <td><strong>${codigo}</strong></td>
         <td>${dataEmis}</td>
         <td>
@@ -1032,6 +1284,7 @@
           <strong style="font-size:.82rem">${nomeTransp}</strong>
         </td>
         <td>${situacao}</td>
+        <td><button class="btn-baixa-row" onclick='openBaixaModal(${mStr})'>Dar Baixa</button></td>
       </tr>`;
     }).join('');
   }
