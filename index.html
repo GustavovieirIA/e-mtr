@@ -1451,7 +1451,7 @@
       if (r.status === 429) return null;  // rate limit — vai retentar
       if (!r.ok) return '';               // 404 ou outro erro — sem nome
       const d = await r.json();
-      return (d.nome_fantasia?.trim()) || d.razao_social || '';
+      return d.razao_social || '';
     };
     try {
       let nome = await _try();
