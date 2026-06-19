@@ -1291,25 +1291,40 @@
 
   function exportarCSV() {
     if (!_ultimoResultado.length) return;
-    const headers = ['Nº MTR','Data Emissão','CNPJ Gerador','Nome Gerador','CNPJ Transportador','Nome Transportador','Situação'];
+
+    // Colunas fixas — mesma estrutura aceita pelo upload de baixa em massa
+    const headers = [
+      'Nº MTR', 'Data Emissão', 'CNPJ Gerador', 'CNPJ Transportador',
+      'Situação', 'Data de recebimento', 'Motorista', 'Placa',
+      'Responsável pelo recebimento', 'Cargo', 'Tecnologia', 'Qt. Recebida', 'Justificativa'
+    ];
+
     const rows = _ultimoResultado.map(m => {
-      const cg = m.cnpGerador ?? m.cnpjGerador ?? '';
-      const ct = m.cnpTransportador ?? m.cnpjTransportador ?? '';
+      const cg        = m.cnpGerador      ?? '';
+      const ct        = m.cnpTransportador ?? '';
+      const firstItem = (m.itens || [])[0] || {};
       return [
-        m.manifestoCodigo ?? m.codigo ?? '',
+        m.manifestoCodigo ?? '',
         formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
         cg,
-        _nomeMap[cg] || cg,
         ct,
-        _nomeMap[ct] || ct,
-        m.situacao ?? (m.situacaoManifestoCodigo === 1 ? 'Emitido (aguarda baixa)' : m.situacaoManifestoCodigo === 3 ? 'Recebido' : m.situacaoManifestoCodigo === 4 ? 'Cancelado' : 'Em aberto')
-      ].map(v => `"${String(v).replace(/"/g,'""')}"`);
+        m.situacao ?? 'Emitido (aguarda baixa)',
+        '',                                       // Data de recebimento — operador preenche
+        (m.nomeMotorista && m.nomeMotorista.trim()) ? m.nomeMotorista.trim() : 'Claudio',
+        m.placaVeiculo ?? '',
+        'Victoria Abrahão',
+        'Analista ambiental',
+        firstItem.codigoTecnologia ?? '',
+        firstItem.quantidade       ?? '',
+        ''                                        // Justificativa — operador preenche
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`);
     });
-    const csv = [headers.map(h=>`"${h}"`), ...rows].map(r=>r.join(';')).join('\n');
-    const blob = new Blob(['\ufeff'+csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+
+    const csv  = [headers.map(h => `"${h}"`), ...rows].map(r => r.join(';')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
     a.href = url; a.download = `MTRs_pendentes_${hoje}.csv`; a.click();
     URL.revokeObjectURL(url);
   }
