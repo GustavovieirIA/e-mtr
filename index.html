@@ -512,17 +512,31 @@
     <p style="font-size:.82rem;color:#718096;margin:-12px 0 18px">
       Credenciais de cada sistema, salvas localmente no navegador. Cada sistema tem o seu acesso.
     </p>
-    <div class="field">
-      <label>Pessoa Código</label>
-      <input type="number" id="cfg-pessoaCodigo" placeholder="Ex.: 176165">
+    <!-- Campos FEAM-MG (API antiga /api) -->
+    <div class="dialect-feam">
+      <div class="field">
+        <label>Pessoa Código <span style="font-weight:400;color:#a0aec0">(código da unidade)</span></label>
+        <input type="number" id="cfg-pessoaCodigo" placeholder="Ex.: 176165">
+      </div>
+      <div class="field">
+        <label>CNPJ</label>
+        <input type="text" id="cfg-pessoaCnpj" placeholder="00000000000000" maxlength="18">
+      </div>
+      <div class="field">
+        <label>CPF do Usuário</label>
+        <input type="text" id="cfg-usuarioCpf" placeholder="00000000000" maxlength="14">
+      </div>
     </div>
-    <div class="field">
-      <label>CNPJ</label>
-      <input type="text" id="cfg-pessoaCnpj" placeholder="00000000000000" maxlength="18">
-    </div>
-    <div class="field">
-      <label>CPF do Usuário</label>
-      <input type="text" id="cfg-usuarioCpf" placeholder="00000000000" maxlength="14">
+    <!-- Campos SINIR / INEA (API nova /apiws/rest) -->
+    <div class="dialect-sinir">
+      <div class="field">
+        <label>CPF ou CNPJ</label>
+        <input type="text" id="cfg-cpfCnpj" placeholder="00000000000000" maxlength="18">
+      </div>
+      <div class="field">
+        <label>Unidade <span style="font-weight:400;color:#a0aec0">(código da unidade)</span></label>
+        <input type="text" id="cfg-unidade" placeholder="Ex.: 12346">
+      </div>
     </div>
     <div class="field">
       <label>Senha</label>
@@ -929,37 +943,54 @@
 </div><!-- /.container -->
 
 <script>
-  // ── Webhook URLs ─────────────────────────────────────────────────────────────
-  const WEBHOOK_EMITIR   = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/831fe3a5-9651-4b0f-9afd-e889cca332e6';
-  const WEBHOOK_BAIXA    = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/e2ee3b8d-8e87-4a68-92de-8f632f257538';
-  const WEBHOOK_CONSULTA = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/c7e4a2f1-3b8d-4c9e-a5f2-d1b6c8e3f7a4';
-  // ─────────────────────────────────────────────────────────────────────────────
+  // ── Webhooks por dialeto de API ──────────────────────────────────────────────
+  // FEAM-MG usa a API antiga (/api). SINIR e INEA usam a API nova (/apiws/rest).
+  const WEBHOOK_BASE = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/';
+  const WEBHOOKS = {
+    feam: {
+      emitir:   '831fe3a5-9651-4b0f-9afd-e889cca332e6',
+      baixa:    'e2ee3b8d-8e87-4a68-92de-8f632f257538',
+      consulta: 'c7e4a2f1-3b8d-4c9e-a5f2-d1b6c8e3f7a4',
+    },
+    sinir: {
+      emitir:   '85efa7e1-0a8b-4450-89db-0ebe36afafb3',
+      baixa:    '68041992-2d32-48b6-9b97-b56289df7fbc',
+      consulta: '38ae7d34-fc67-443c-8db1-ceb24cab63a4',
+    },
+  };
 
   // ── Sistemas MTR (FEAM-MG, INEA-RJ, SINIR-Federal) ───────────────────────────
-  // Mesmo software, muda só a URL da API e as credenciais. URL editável em Configurações.
+  // dialect: qual API o sistema fala. URL confirmada por teste ao vivo (jun/2026).
   const SISTEMAS = {
-    feam:  { nome: 'FEAM-MG',         url: 'https://mtr.meioambiente.mg.gov.br/api' },
-    inea:  { nome: 'INEA-RJ',         url: 'https://mtr.inea.rj.gov.br/api' },
-    sinir: { nome: 'SINIR (Federal)', url: 'https://mtr.sinir.gov.br/api' },
+    feam:  { nome: 'FEAM-MG',         dialect: 'feam',  url: 'https://mtr.meioambiente.mg.gov.br/api' },
+    inea:  { nome: 'INEA-RJ',         dialect: 'sinir', url: 'https://mtr.inea.rj.gov.br/apiws/rest' },
+    sinir: { nome: 'SINIR (Federal)', dialect: 'sinir', url: 'https://admin.sinir.gov.br/apiws/rest' },
   };
 
   function sistemaAtivo() { return localStorage.getItem('mtr_sistema') || 'feam'; }
+  function dialetoAtivo() { return SISTEMAS[sistemaAtivo()]?.dialect || 'feam'; }
   function _credKey(sis)  { return 'mtr_auth_' + sis; }
   function _cred()        { return JSON.parse(localStorage.getItem(_credKey(sistemaAtivo())) || '{}'); }
 
-  // Payload enviado aos webhooks: auth (4 campos p/ gettoken) + apiBase (URL do sistema)
+  function webhookURL(feature) {
+    return WEBHOOK_BASE + (WEBHOOKS[dialetoAtivo()]?.[feature] || '');
+  }
+
+  // Campos obrigatórios do gettoken, por dialeto
+  function _camposObrigatorios() {
+    return dialetoAtivo() === 'sinir'
+      ? ['cpfCnpj', 'unidade', 'senha']
+      : ['pessoaCodigo', 'pessoaCnpj', 'usuarioCpf', 'senha'];
+  }
+
+  // Payload enviado aos webhooks: auth (campos do gettoken conforme dialeto) + apiBase
   function getAuthPayload() {
     const sis = sistemaAtivo();
     const c   = _cred();
-    return {
-      auth: {
-        pessoaCodigo: c.pessoaCodigo,
-        pessoaCnpj:   c.pessoaCnpj,
-        usuarioCpf:   c.usuarioCpf,
-        senha:        c.senha
-      },
-      apiBase: c.apiBase || SISTEMAS[sis]?.url || ''
-    };
+    const auth = dialetoAtivo() === 'sinir'
+      ? { cpfCnpj: c.cpfCnpj, senha: c.senha, unidade: c.unidade }
+      : { pessoaCodigo: c.pessoaCodigo, pessoaCnpj: c.pessoaCnpj, usuarioCpf: c.usuarioCpf, senha: c.senha };
+    return { auth, apiBase: c.apiBase || SISTEMAS[sis]?.url || '', dialect: dialetoAtivo() };
   }
 
   function _initSistema() {
@@ -979,7 +1010,7 @@
 
   function _atualizaBtnConfig() {
     const c   = _cred();
-    const ok  = c.pessoaCodigo && c.pessoaCnpj && c.usuarioCpf && c.senha;
+    const ok  = _camposObrigatorios().every(k => c[k]);
     const btn = document.getElementById('btn-config');
     if (!btn) return;
     btn.classList.toggle('sem-auth', !ok);
@@ -989,12 +1020,18 @@
   function abrirConfig() {
     const sis = sistemaAtivo();
     const c   = _cred();
-    document.getElementById('cfg-titulo').textContent  = 'Acesso: ' + SISTEMAS[sis].nome;
-    document.getElementById('cfg-pessoaCodigo').value  = c.pessoaCodigo || '';
-    document.getElementById('cfg-pessoaCnpj').value    = c.pessoaCnpj   || '';
-    document.getElementById('cfg-usuarioCpf').value    = c.usuarioCpf   || '';
-    document.getElementById('cfg-senha').value         = c.senha        || '';
-    document.getElementById('cfg-apiBase').value       = c.apiBase || SISTEMAS[sis].url || '';
+    const dial = dialetoAtivo();
+    document.getElementById('cfg-titulo').textContent = 'Acesso: ' + SISTEMAS[sis].nome;
+    // mostra só os campos do dialeto ativo
+    document.querySelectorAll('.dialect-feam').forEach(el => el.style.display  = dial === 'feam'  ? '' : 'none');
+    document.querySelectorAll('.dialect-sinir').forEach(el => el.style.display = dial === 'sinir' ? '' : 'none');
+    document.getElementById('cfg-pessoaCodigo').value = c.pessoaCodigo || '';
+    document.getElementById('cfg-pessoaCnpj').value   = c.pessoaCnpj   || '';
+    document.getElementById('cfg-usuarioCpf').value   = c.usuarioCpf   || '';
+    document.getElementById('cfg-cpfCnpj').value      = c.cpfCnpj      || '';
+    document.getElementById('cfg-unidade').value      = c.unidade      || '';
+    document.getElementById('cfg-senha').value        = c.senha        || '';
+    document.getElementById('cfg-apiBase').value      = c.apiBase || SISTEMAS[sis].url || '';
     document.getElementById('modal-config').style.display = 'flex';
   }
 
@@ -1004,16 +1041,24 @@
 
   function salvarConfig() {
     const sis     = sistemaAtivo();
-    const cod     = parseInt(document.getElementById('cfg-pessoaCodigo').value);
-    const cnpj    = document.getElementById('cfg-pessoaCnpj').value.replace(/\D/g, '');
-    const cpf     = document.getElementById('cfg-usuarioCpf').value.replace(/\D/g, '');
+    const dial    = dialetoAtivo();
     const senha   = document.getElementById('cfg-senha').value.trim();
     const apiBase = document.getElementById('cfg-apiBase').value.trim().replace(/\/+$/, '');
-    if (!cod || !cnpj || !cpf || !senha) { alert('Preencha todos os campos de acesso.'); return; }
+    let cred;
+    if (dial === 'sinir') {
+      const cpfCnpj = document.getElementById('cfg-cpfCnpj').value.replace(/\D/g, '');
+      const unidade = document.getElementById('cfg-unidade').value.trim();
+      if (!cpfCnpj || !unidade || !senha) { alert('Preencha CPF/CNPJ, Unidade e Senha.'); return; }
+      cred = { cpfCnpj, unidade, senha, apiBase };
+    } else {
+      const cod = parseInt(document.getElementById('cfg-pessoaCodigo').value);
+      const cnpj = document.getElementById('cfg-pessoaCnpj').value.replace(/\D/g, '');
+      const cpf  = document.getElementById('cfg-usuarioCpf').value.replace(/\D/g, '');
+      if (!cod || !cnpj || !cpf || !senha) { alert('Preencha todos os campos de acesso.'); return; }
+      cred = { pessoaCodigo: cod, pessoaCnpj: cnpj, usuarioCpf: cpf, senha, apiBase };
+    }
     if (!apiBase) { alert('Informe a URL da API.'); return; }
-    localStorage.setItem(_credKey(sis), JSON.stringify({
-      pessoaCodigo: cod, pessoaCnpj: cnpj, usuarioCpf: cpf, senha, apiBase
-    }));
+    localStorage.setItem(_credKey(sis), JSON.stringify(cred));
     fecharConfig();
     _atualizaBtnConfig();
   }
@@ -1307,7 +1352,7 @@
       'Seu Código de Referência':           opt(val('e-seuCodigoReferencia')),
       'Observações':                        opt(val('e-observacoes')),
     };
-    postJSON(WEBHOOK_EMITIR, payload, 'btn-emitir', 'resp-emitir');
+    postJSON(webhookURL('emitir'), payload, 'btn-emitir', 'resp-emitir');
   }
 
   function submitBaixa() {
@@ -1331,7 +1376,7 @@
       'Código de Estado Físico':              numVal('b-codEstadoFisico'),
       'Observações do Recebimento':           opt(val('b-observacoes')),
     };
-    postJSON(WEBHOOK_BAIXA, payload, 'btn-baixa', 'resp-baixa');
+    postJSON(webhookURL('baixa'), payload, 'btn-baixa', 'resp-baixa');
   }
 
 
@@ -1422,7 +1467,7 @@
     document.getElementById('m-resp').textContent = '';
 
     try {
-      const res  = await fetch(WEBHOOK_BAIXA, {
+      const res  = await fetch(webhookURL('baixa'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...payload, ...getAuthPayload() })
@@ -1646,7 +1691,7 @@
       };
 
       try {
-        const res  = await fetch(WEBHOOK_BAIXA, {
+        const res  = await fetch(webhookURL('baixa'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...payload, ...getAuthPayload() })
@@ -1861,8 +1906,8 @@
     if (inicio > fim) {
       showResponse('resp-consulta', '❌ Data Início deve ser anterior à Data Fim.', true); return;
     }
-    if (WEBHOOK_CONSULTA.startsWith('COLE_AQUI')) {
-      showResponse('resp-consulta', '❌ Configure o WEBHOOK_CONSULTA no topo do script após importar o workflow 3 no n8n.', true); return;
+    if (!_camposObrigatorios().every(k => _cred()[k])) {
+      showResponse('resp-consulta', `❌ Configure o acesso de ${SISTEMAS[sistemaAtivo()].nome} em ⚙ Configurações antes de consultar.`, true); return;
     }
 
     const btn = document.getElementById('btn-consulta');
@@ -1871,7 +1916,7 @@
     document.getElementById('resp-consulta').className = 'response-box';
 
     try {
-      const res = await fetch(WEBHOOK_CONSULTA, {
+      const res = await fetch(webhookURL('consulta'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fimMaisUm(fim)), ...getAuthPayload() })
