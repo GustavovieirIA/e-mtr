@@ -1928,8 +1928,10 @@
       const nomeTransp = m.nomeTransportador || _nomeMap[ct] || '';
       const fi         = (m.itens || [])[0]  || {};
       const motorista  = (m.nomeMotorista?.trim()) || 'Claudio';
-      // SINIR já manda a sigla (t, kg…); FEAM usa o mapa de códigos
-      const unidade    = fi.unidadeSigla || UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '');
+      // SINIR manda a sigla (TON, KG…) — os códigos do SINIR são diferentes do FEAM,
+      // então NUNCA usar UNIT_MAP no SINIR (cód. 3 = Tonelada no SINIR, mas kg no FEAM).
+      const unidade    = fi.unidadeSigla
+        || (dialetoAtivo() === 'sinir' ? '' : (UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '')));
       return [
         m.manifestoCodigo ?? '',
         formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
