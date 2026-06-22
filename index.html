@@ -30,6 +30,19 @@
     }
     .btn-config:hover { background: rgba(255,255,255,.28); }
     .btn-config.sem-auth { background: rgba(231,76,60,.55); border-color: rgba(231,76,60,.7); }
+    .header-actions { display: flex; gap: 14px; align-items: center; }
+    .sistema-wrap { display: flex; flex-direction: column; gap: 2px; }
+    .sistema-wrap label { font-size: .66rem; text-transform: uppercase; letter-spacing: .6px; opacity: .7; }
+    .sistema-sel {
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35);
+      color: #fff; border-radius: 7px; padding: 6px 9px; font-size: .85rem;
+      cursor: pointer; font-weight: 600;
+    }
+    .sistema-sel option { color: #1a2530; }
+    @media (max-width: 560px) {
+      header { flex-direction: column; gap: 12px; align-items: stretch; }
+      .header-actions { justify-content: space-between; }
+    }
 
     .container { max-width: 780px; margin: 32px auto; padding: 0 16px 48px; }
 
@@ -483,15 +496,21 @@
     <h1>E-MTR — Manifesto de Transporte de Resíduos</h1>
     <p>Sistema Eletrônico de Gerenciamento de Resíduos</p>
   </div>
-  <button class="btn-config" id="btn-config" onclick="abrirConfig()">⚙ Configurações</button>
+  <div class="header-actions">
+    <div class="sistema-wrap">
+      <label for="sistema-sel">Sistema</label>
+      <select class="sistema-sel" id="sistema-sel" onchange="trocarSistema(this.value)"></select>
+    </div>
+    <button class="btn-config" id="btn-config" onclick="abrirConfig()">⚙ Configurações</button>
+  </div>
 </header>
 
 <!-- ===== Modal Configurações ===== -->
 <div id="modal-config" class="modal-overlay" style="display:none" onclick="if(event.target===this)fecharConfig()">
   <div class="modal-box" style="max-width:420px">
-    <h3 style="margin:0 0 20px;color:#1a5276;font-size:1.05rem">Acesso MTR-MG</h3>
+    <h3 id="cfg-titulo" style="margin:0 0 20px;color:#1a5276;font-size:1.05rem">Acesso</h3>
     <p style="font-size:.82rem;color:#718096;margin:-12px 0 18px">
-      Credenciais usadas para autenticar nos workflows n8n. Salvas localmente no navegador.
+      Credenciais de cada sistema, salvas localmente no navegador. Cada sistema tem o seu acesso.
     </p>
     <div class="field">
       <label>Pessoa Código</label>
@@ -508,6 +527,10 @@
     <div class="field">
       <label>Senha</label>
       <input type="password" id="cfg-senha" placeholder="Senha de acesso">
+    </div>
+    <div class="field">
+      <label>URL da API <span style="font-weight:400;color:#a0aec0">(padrão do sistema)</span></label>
+      <input type="text" id="cfg-apiBase" placeholder="https://.../api">
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
       <button class="btn-modal-cancel" onclick="fecharConfig()">Cancelar</button>
@@ -912,14 +935,51 @@
   const WEBHOOK_CONSULTA = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/c7e4a2f1-3b8d-4c9e-a5f2-d1b6c8e3f7a4';
   // ─────────────────────────────────────────────────────────────────────────────
 
-  // ── Configurações de acesso ──────────────────────────────────────────────────
-  function getAuth() {
-    return JSON.parse(localStorage.getItem('mtr_auth') || '{}');
+  // ── Sistemas MTR (FEAM-MG, INEA-RJ, SINIR-Federal) ───────────────────────────
+  // Mesmo software, muda só a URL da API e as credenciais. URL editável em Configurações.
+  const SISTEMAS = {
+    feam:  { nome: 'FEAM-MG',         url: 'https://mtr.meioambiente.mg.gov.br/api' },
+    inea:  { nome: 'INEA-RJ',         url: 'https://mtr.inea.rj.gov.br/api' },
+    sinir: { nome: 'SINIR (Federal)', url: 'https://mtr.sinir.gov.br/api' },
+  };
+
+  function sistemaAtivo() { return localStorage.getItem('mtr_sistema') || 'feam'; }
+  function _credKey(sis)  { return 'mtr_auth_' + sis; }
+  function _cred()        { return JSON.parse(localStorage.getItem(_credKey(sistemaAtivo())) || '{}'); }
+
+  // Payload enviado aos webhooks: auth (4 campos p/ gettoken) + apiBase (URL do sistema)
+  function getAuthPayload() {
+    const sis = sistemaAtivo();
+    const c   = _cred();
+    return {
+      auth: {
+        pessoaCodigo: c.pessoaCodigo,
+        pessoaCnpj:   c.pessoaCnpj,
+        usuarioCpf:   c.usuarioCpf,
+        senha:        c.senha
+      },
+      apiBase: c.apiBase || SISTEMAS[sis]?.url || ''
+    };
+  }
+
+  function _initSistema() {
+    const sel = document.getElementById('sistema-sel');
+    if (sel) {
+      sel.innerHTML = Object.entries(SISTEMAS)
+        .map(([k, v]) => `<option value="${k}">${v.nome}</option>`).join('');
+      sel.value = sistemaAtivo();
+    }
+    _atualizaBtnConfig();
+  }
+
+  function trocarSistema(sis) {
+    localStorage.setItem('mtr_sistema', sis);
+    _atualizaBtnConfig();
   }
 
   function _atualizaBtnConfig() {
-    const c = getAuth();
-    const ok = c.pessoaCodigo && c.pessoaCnpj && c.usuarioCpf && c.senha;
+    const c   = _cred();
+    const ok  = c.pessoaCodigo && c.pessoaCnpj && c.usuarioCpf && c.senha;
     const btn = document.getElementById('btn-config');
     if (!btn) return;
     btn.classList.toggle('sem-auth', !ok);
@@ -927,11 +987,14 @@
   }
 
   function abrirConfig() {
-    const c = getAuth();
-    document.getElementById('cfg-pessoaCodigo').value = c.pessoaCodigo || '';
-    document.getElementById('cfg-pessoaCnpj').value   = c.pessoaCnpj   || '';
-    document.getElementById('cfg-usuarioCpf').value   = c.usuarioCpf   || '';
-    document.getElementById('cfg-senha').value        = c.senha        || '';
+    const sis = sistemaAtivo();
+    const c   = _cred();
+    document.getElementById('cfg-titulo').textContent  = 'Acesso: ' + SISTEMAS[sis].nome;
+    document.getElementById('cfg-pessoaCodigo').value  = c.pessoaCodigo || '';
+    document.getElementById('cfg-pessoaCnpj').value    = c.pessoaCnpj   || '';
+    document.getElementById('cfg-usuarioCpf').value    = c.usuarioCpf   || '';
+    document.getElementById('cfg-senha').value         = c.senha        || '';
+    document.getElementById('cfg-apiBase').value       = c.apiBase || SISTEMAS[sis].url || '';
     document.getElementById('modal-config').style.display = 'flex';
   }
 
@@ -940,17 +1003,22 @@
   }
 
   function salvarConfig() {
-    const cod   = parseInt(document.getElementById('cfg-pessoaCodigo').value);
-    const cnpj  = document.getElementById('cfg-pessoaCnpj').value.replace(/\D/g, '');
-    const cpf   = document.getElementById('cfg-usuarioCpf').value.replace(/\D/g, '');
-    const senha = document.getElementById('cfg-senha').value.trim();
-    if (!cod || !cnpj || !cpf || !senha) { alert('Preencha todos os campos.'); return; }
-    localStorage.setItem('mtr_auth', JSON.stringify({ pessoaCodigo: cod, pessoaCnpj: cnpj, usuarioCpf: cpf, senha }));
+    const sis     = sistemaAtivo();
+    const cod     = parseInt(document.getElementById('cfg-pessoaCodigo').value);
+    const cnpj    = document.getElementById('cfg-pessoaCnpj').value.replace(/\D/g, '');
+    const cpf     = document.getElementById('cfg-usuarioCpf').value.replace(/\D/g, '');
+    const senha   = document.getElementById('cfg-senha').value.trim();
+    const apiBase = document.getElementById('cfg-apiBase').value.trim().replace(/\/+$/, '');
+    if (!cod || !cnpj || !cpf || !senha) { alert('Preencha todos os campos de acesso.'); return; }
+    if (!apiBase) { alert('Informe a URL da API.'); return; }
+    localStorage.setItem(_credKey(sis), JSON.stringify({
+      pessoaCodigo: cod, pessoaCnpj: cnpj, usuarioCpf: cpf, senha, apiBase
+    }));
     fecharConfig();
     _atualizaBtnConfig();
   }
 
-  window.addEventListener('DOMContentLoaded', _atualizaBtnConfig);
+  window.addEventListener('DOMContentLoaded', _initSistema);
   // ─────────────────────────────────────────────────────────────────────────────
 
   // ── Tabelas de domínio ───────────────────────────────────────────────────────
@@ -1198,7 +1266,7 @@
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...clean, auth: getAuth() }),
+        body: JSON.stringify({ ...clean, ...getAuthPayload() }),
       });
       let body;
       const ct = res.headers.get('content-type') || '';
@@ -1357,7 +1425,7 @@
       const res  = await fetch(WEBHOOK_BAIXA, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, auth: getAuth() })
+        body: JSON.stringify({ ...payload, ...getAuthPayload() })
       });
       const ct   = res.headers.get('content-type') || '';
       const body = ct.includes('json') ? await res.json() : await res.text();
@@ -1581,7 +1649,7 @@
         const res  = await fetch(WEBHOOK_BAIXA, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, auth: getAuth() })
+          body: JSON.stringify({ ...payload, ...getAuthPayload() })
         });
         const ct   = res.headers.get('content-type') || '';
         const body = ct.includes('json') ? await res.json() : await res.text();
@@ -1806,7 +1874,7 @@
       const res = await fetch(WEBHOOK_CONSULTA, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fimMaisUm(fim)), auth: getAuth() })
+        body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fimMaisUm(fim)), ...getAuthPayload() })
       });
       const ct = res.headers.get('content-type') || '';
       const body = ct.includes('json') ? await res.json() : await res.text();
