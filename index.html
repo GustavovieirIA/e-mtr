@@ -442,8 +442,17 @@
     .btn-massa:disabled { opacity: .6; cursor: not-allowed; }
     .massa-table-wrap {
       overflow-x: auto; border-radius: 6px; border: 1px solid #e8ecf0;
-      max-height: 340px; overflow-y: auto;
+      max-height: 480px; overflow-y: auto;
     }
+    .massa-input {
+      border: none; border-bottom: 1px solid #cbd5e0;
+      padding: 2px 4px; font-size: .8rem; background: transparent;
+      width: 100%; box-sizing: border-box; font-family: inherit; color: #2d3748;
+    }
+    .massa-input:focus { outline: none; border-bottom: 2px solid #2980b9; background: #eef5fb; }
+    .massa-input::placeholder { color: #b0bec5; }
+    .cell-warn input { border-bottom-color: #e74c3c; }
+    .cell-warn input::placeholder { color: #e74c3c; }
     .massa-progress-bar {
       height: 10px; background: #e8ecf0; border-radius: 5px;
       margin-top: 14px; overflow: hidden;
@@ -708,9 +717,9 @@
                ondrop="event.preventDefault();this.classList.remove('drag-over');
                        document.getElementById('csv-massa-input').files=event.dataTransfer.files;
                        handleCSVUpload({target:document.getElementById('csv-massa-input')})">
-          <span id="upload-label-text">📂 Clique ou arraste o arquivo CSV aqui</span>
-          <small>Formato: CSV com ponto-e-vírgula (exportado pelo sistema)</small>
-          <input type="file" id="csv-massa-input" accept=".csv" style="display:none"
+          <span id="upload-label-text">📂 Clique ou arraste o arquivo Excel aqui</span>
+          <small>Formato: .xlsx exportado pelo sistema (ou .csv com ponto-e-vírgula)</small>
+          <input type="file" id="csv-massa-input" accept=".xlsx,.csv" style="display:none"
                  onchange="handleCSVUpload(event)" />
         </label>
 
@@ -726,9 +735,14 @@
             <table class="results-table" id="massa-preview-table">
               <thead><tr>
                 <th>Nº MTR</th><th>Data Emissão</th>
-                <th>CNPJ Gerador</th><th>CNPJ Transportador</th>
-                <th>Data Recebimento</th><th>Motorista</th>
-                <th>Qt. Recebida</th><th>Status</th>
+                <th>Gerador</th><th>Transportador</th>
+                <th style="min-width:110px">Data Recebimento ✏</th>
+                <th style="min-width:110px">Motorista ✏</th>
+                <th style="min-width:70px">Placa ✏</th>
+                <th>Qt. Indicada</th>
+                <th style="min-width:80px">Qt. Recebida ✏</th>
+                <th style="min-width:160px">Justificativa ✏</th>
+                <th>Status</th>
               </tr></thead>
               <tbody id="massa-preview-tbody"></tbody>
             </table>
@@ -1325,33 +1339,61 @@
     if (!file) return;
     document.getElementById('upload-label-text').textContent = `📄 ${file.name}`;
     const reader = new FileReader();
+    const isXlsx = file.name.toLowerCase().endsWith('.xlsx');
     reader.onload = e => {
-      _csvRows = _parseCSV(e.target.result);
-      if (!_csvRows.length) { alert('CSV vazio ou inválido.'); return; }
+      if (isXlsx) {
+        const wb   = XLSX.read(e.target.result, { type: 'array' });
+        const ws   = wb.Sheets[wb.SheetNames[0]];
+        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        _csvRows   = data.map(row => {
+          const out = {};
+          Object.entries(row).forEach(([k, v]) => out[k.trim()] = String(v ?? '').trim());
+          return out;
+        });
+      } else {
+        _csvRows = _parseCSV(e.target.result);
+      }
+      if (!_csvRows.length) { alert('Arquivo vazio ou inválido.'); return; }
       _renderCSVPreview();
     };
-    reader.readAsText(file, 'UTF-8');
+    if (isXlsx) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file, 'UTF-8');
   }
 
   function _renderCSVPreview() {
     const tbody = document.getElementById('massa-preview-tbody');
     tbody.innerHTML = _csvRows.map((r, i) => {
-      const semData = !r['Data de recebimento']?.trim();
+      const semData    = !r['Data de recebimento']?.trim();
+      const nomeGer    = r['Nome Gerador']      || r['CNPJ Gerador']      || '—';
+      const nomeTransp = r['Nome Transportador'] || r['CNPJ Transportador'] || '—';
+      const esc = s => String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
       return `<tr id="massa-row-${i}">
         <td><strong>${r['Nº MTR'] || '—'}</strong></td>
-        <td>${r['Data Emissão'] || '—'}</td>
-        <td style="font-family:monospace;font-size:.76rem">${r['CNPJ Gerador'] || '—'}</td>
-        <td style="font-family:monospace;font-size:.76rem">${r['CNPJ Transportador'] || '—'}</td>
-        <td>${semData ? '<span style="color:#c0392b;font-size:.78rem">⚠ vazia</span>' : r['Data de recebimento']}</td>
-        <td style="font-size:.8rem">${r['Motorista'] || '—'}</td>
-        <td style="text-align:right">${r['Qt. Recebida'] || '—'}</td>
-        <td class="status-wait" id="massa-status-${i}">Aguardando</td>
+        <td style="font-size:.78rem;white-space:nowrap">${r['Data Emissão'] || '—'}</td>
+        <td style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeGer)}">${nomeGer}</td>
+        <td style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeTransp)}">${nomeTransp}</td>
+        <td class="${semData ? 'cell-warn' : ''}">
+          <input class="massa-input" id="input-${i}-dataReceb"
+                 value="${esc(r['Data de recebimento'])}" placeholder="${semData ? '⚠ preencher' : 'dd/mm/aaaa'}">
+        </td>
+        <td><input class="massa-input" id="input-${i}-motorista"
+                   value="${esc(r['Motorista'])}" placeholder="Motorista"></td>
+        <td><input class="massa-input" id="input-${i}-placa" style="width:72px"
+                   value="${esc(r['Placa'])}" placeholder="Placa"></td>
+        <td style="text-align:right;color:#718096;font-size:.8rem;white-space:nowrap">
+          ${r['Qt. Indicada'] || '—'} ${r['Unidade'] || ''}</td>
+        <td><input class="massa-input" id="input-${i}-qtReceb" style="width:68px;text-align:right"
+                   value="${esc(r['Qt. Recebida'])}" placeholder="—"></td>
+        <td><input class="massa-input" id="input-${i}-justif" style="min-width:150px"
+                   value="${esc(r['Justificativa'])}" placeholder="Justificativa"></td>
+        <td class="status-wait" id="massa-status-${i}">—</td>
       </tr>`;
     }).join('');
+
     const total   = _csvRows.length;
     const semData = _csvRows.filter(r => !r['Data de recebimento']?.trim()).length;
     document.getElementById('massa-count').textContent =
-      `${total} registro(s)` + (semData ? ` — ⚠ ${semData} sem data` : '');
+      `${total} registro(s)` + (semData ? ` — ⚠ ${semData} sem data de recebimento` : ' — revise e clique em Processar');
     document.getElementById('massa-preview').style.display = 'block';
     document.getElementById('massa-progress-wrap').style.display = 'none';
     document.getElementById('btn-massa').disabled = false;
@@ -1369,7 +1411,12 @@
   async function processarBaixasMassa() {
     const rows = _csvRows.filter(r => r['Nº MTR']?.trim());
     if (!rows.length) return;
-    const semData = rows.filter(r => !r['Data de recebimento']?.trim()).length;
+
+    // conta linhas sem data usando os valores actuais dos inputs (podem ter sido editados)
+    const rowIdxs = rows.map(r => _csvRows.indexOf(r));
+    const semData = rowIdxs.filter(i =>
+      !(document.getElementById(`input-${i}-dataReceb`)?.value?.trim())
+    ).length;
     if (semData && !confirm(`${semData} linha(s) sem Data de Recebimento serão puladas. Continuar?`)) return;
 
     const btn = document.getElementById('btn-massa');
@@ -1381,13 +1428,20 @@
     let ok = 0, err = 0, skip = 0;
 
     for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      const rowIdx   = _csvRows.indexOf(r);
-      const statusEl = document.getElementById(`massa-status-${rowIdx}`);
+      const r      = rows[i];
+      const idx    = _csvRows.indexOf(r);
+      const statusEl = document.getElementById(`massa-status-${idx}`);
       fill.style.width = Math.round((i / rows.length) * 100) + '%';
       label.textContent = `${i}/${rows.length} — ✅ ${ok}  ❌ ${err}  ⏭ ${skip}`;
 
-      if (!r['Data de recebimento']?.trim()) {
+      // lê valores do DOM (editados pelo operador têm precedência)
+      const dataReceb = document.getElementById(`input-${idx}-dataReceb`)?.value?.trim() || '';
+      const motorista = document.getElementById(`input-${idx}-motorista`)?.value?.trim() || r['Motorista'] || '';
+      const placa     = document.getElementById(`input-${idx}-placa`)?.value?.trim()     || r['Placa']    || '';
+      const qtReceb   = document.getElementById(`input-${idx}-qtReceb`)?.value?.trim()   || r['Qt. Indicada'] || '';
+      const justif    = document.getElementById(`input-${idx}-justif`)?.value?.trim()    || r['Justificativa'] || '';
+
+      if (!dataReceb) {
         if (statusEl) { statusEl.className = 'status-skip'; statusEl.textContent = '⏭ Pulado (sem data)'; }
         skip++; continue;
       }
@@ -1396,18 +1450,18 @@
 
       const payload = {
         'Número do Manifesto (10 dígitos)':     r['Nº MTR'],
-        'CNPJ do Gerador':                       r['CNPJ Gerador']             || '',
-        'CNPJ do Transportador':                 r['CNPJ Transportador']        || '',
-        'Nome do Responsável pelo Recebimento':  r['Responsável pelo recebimento'] || '',
-        'Cargo do Responsável':                  r['Cargo']                     || '',
-        'Data de Recebimento (AAAAMMDD)':        _csvDateToAPI(r['Data de recebimento']),
-        'Observações do Recebimento':            r['Justificativa']             || '',
-        'Nome do Motorista':                     r['Motorista']                 || '',
-        'Placa do Veículo':                      r['Placa']                     || '',
-        'Quantidade Recebida':                   r['Qt. Recebida'] || r['Qt. Indicada'] || '',
-        'Código do Resíduo (IBAMA)':             r['Resíduo']                   || '',
-        'Código de Tecnologia':                  r['Tecnologia']                || '',
-        'Código de Estado Físico':               r['Cód. Estado Físico']        || ''
+        'CNPJ do Gerador':                       r['CNPJ Gerador']                  || '',
+        'CNPJ do Transportador':                 r['CNPJ Transportador']             || '',
+        'Nome do Responsável pelo Recebimento':  r['Responsável pelo recebimento']   || 'Victoria Abrahão',
+        'Cargo do Responsável':                  r['Cargo']                          || 'Analista ambiental',
+        'Data de Recebimento (AAAAMMDD)':        _csvDateToAPI(dataReceb),
+        'Observações do Recebimento':            justif,
+        'Nome do Motorista':                     motorista,
+        'Placa do Veículo':                      placa,
+        'Quantidade Recebida':                   qtReceb,
+        'Código do Resíduo (IBAMA)':             r['Resíduo']                        || '',
+        'Código de Tecnologia':                  r['Tecnologia']                     || '',
+        'Código de Estado Físico':               r['Cód. Estado Físico']             || ''
       };
 
       try {
