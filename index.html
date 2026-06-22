@@ -1928,7 +1928,8 @@
       const nomeTransp = m.nomeTransportador || _nomeMap[ct] || '';
       const fi         = (m.itens || [])[0]  || {};
       const motorista  = (m.nomeMotorista?.trim()) || 'Claudio';
-      const unidade    = UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '');
+      // SINIR já manda a sigla (t, kg…); FEAM usa o mapa de códigos
+      const unidade    = fi.unidadeSigla || UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '');
       return [
         m.manifestoCodigo ?? '',
         formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
