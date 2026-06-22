@@ -846,20 +846,36 @@
     <!-- ===== TAB 3: Consultar MTRs ===== -->
     <div id="panel-consulta" class="tab-panel">
 
-      <p class="section-title">Período</p>
-      <div class="date-row">
-        <div class="field">
-          <label>Data Início</label>
-          <input type="date" id="c-dataInicio" />
+      <!-- FEAM: consulta por período -->
+      <div class="consulta-feam">
+        <p class="section-title">Período</p>
+        <div class="date-row" style="grid-template-columns:1fr 1fr">
+          <div class="field">
+            <label>Data Início</label>
+            <input type="date" id="c-dataInicio" />
+          </div>
+          <div class="field">
+            <label>Data Fim</label>
+            <input type="date" id="c-dataFim" />
+          </div>
         </div>
-        <div class="field">
-          <label>Data Fim</label>
-          <input type="date" id="c-dataFim" />
-        </div>
-        <button class="btn-search" id="btn-consulta" onclick="submitConsulta()">
-          Buscar MTRs
-        </button>
       </div>
+
+      <!-- SINIR/INEA: consulta por número (API nova não lista por período) -->
+      <div class="consulta-sinir" style="display:none">
+        <p class="section-title">Números de MTR</p>
+        <p style="font-size:.82rem;color:#718096;margin:0 0 10px">
+          A API do SINIR não lista por período — cole os números dos MTRs (um por linha).
+          Pegue a lista no portal do SINIR.
+        </p>
+        <textarea id="c-numeros" rows="6"
+          placeholder="Ex.:&#10;2509000123456&#10;2509000123457"
+          style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e0;border-radius:8px;font-family:monospace;font-size:.85rem;resize:vertical"></textarea>
+      </div>
+
+      <button class="btn-search" id="btn-consulta" onclick="submitConsulta()" style="margin-top:12px">
+        Buscar MTRs
+      </button>
       <div class="response-box" id="resp-consulta"></div>
 
       <div id="consulta-results" style="display:none">
@@ -1004,11 +1020,20 @@
       sel.value = sistemaAtivo();
     }
     _atualizaBtnConfig();
+    _atualizaConsultaInputs();
   }
 
   function trocarSistema(sis) {
     localStorage.setItem('mtr_sistema', sis);
     _atualizaBtnConfig();
+    _atualizaConsultaInputs();
+  }
+
+  // FEAM consulta por período; SINIR/INEA consulta por número de MTR
+  function _atualizaConsultaInputs() {
+    const sinir = dialetoAtivo() === 'sinir';
+    document.querySelectorAll('.consulta-feam').forEach(el => el.style.display  = sinir ? 'none' : '');
+    document.querySelectorAll('.consulta-sinir').forEach(el => el.style.display = sinir ? '' : 'none');
   }
 
   function _atualizaBtnConfig() {
@@ -1901,16 +1926,29 @@
   }
 
   async function submitConsulta() {
-    const inicio = document.getElementById('c-dataInicio').value;
-    const fim    = document.getElementById('c-dataFim').value;
-    if (!inicio || !fim) {
-      showResponse('resp-consulta', '❌ Informe Data Início e Data Fim.', true); return;
-    }
-    if (inicio > fim) {
-      showResponse('resp-consulta', '❌ Data Início deve ser anterior à Data Fim.', true); return;
-    }
     if (!_camposObrigatorios().every(k => _cred()[k])) {
       showResponse('resp-consulta', `❌ Configure o acesso de ${SISTEMAS[sistemaAtivo()].nome} em ⚙ Configurações antes de consultar.`, true); return;
+    }
+
+    // Monta o corpo conforme o dialeto: FEAM = período, SINIR/INEA = lista de números
+    let corpo;
+    if (dialetoAtivo() === 'sinir') {
+      const numeros = (document.getElementById('c-numeros').value || '')
+        .split(/[\s,;]+/).map(s => s.replace(/\D/g, '')).filter(Boolean);
+      if (!numeros.length) {
+        showResponse('resp-consulta', '❌ Cole ao menos um número de MTR.', true); return;
+      }
+      corpo = { numeros, ...getAuthPayload() };
+    } else {
+      const inicio = document.getElementById('c-dataInicio').value;
+      const fim    = document.getElementById('c-dataFim').value;
+      if (!inicio || !fim) {
+        showResponse('resp-consulta', '❌ Informe Data Início e Data Fim.', true); return;
+      }
+      if (inicio > fim) {
+        showResponse('resp-consulta', '❌ Data Início deve ser anterior à Data Fim.', true); return;
+      }
+      corpo = { dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fimMaisUm(fim)), ...getAuthPayload() };
     }
 
     const btn = document.getElementById('btn-consulta');
@@ -1922,7 +1960,7 @@
       const res = await fetch(webhookURL('consulta'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fimMaisUm(fim)), ...getAuthPayload() })
+        body: JSON.stringify(corpo)
       });
       const ct = res.headers.get('content-type') || '';
       const body = ct.includes('json') ? await res.json() : await res.text();
