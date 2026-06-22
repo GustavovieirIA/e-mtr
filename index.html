@@ -742,6 +742,7 @@
                 <th>Qt. Indicada</th>
                 <th style="min-width:80px">Qt. Recebida ✏</th>
                 <th style="min-width:160px">Justificativa ✏</th>
+                <th style="min-width:80px">Resíduo ✏</th>
                 <th>Status</th>
               </tr></thead>
               <tbody id="massa-preview-tbody"></tbody>
@@ -1414,6 +1415,8 @@
                    value="${esc(r['Qt. Recebida'])}" placeholder="—"></td>
         <td><input class="massa-input" id="input-${i}-justif" style="min-width:150px"
                    value="${esc(r['Justificativa'])}" placeholder="Justificativa"></td>
+        <td><input class="massa-input" id="input-${i}-residuo" style="width:72px"
+                   value="${esc(r['Resíduo'] || r['Residuo'])}" placeholder="Cód."></td>
         <td class="status-wait" id="massa-status-${i}">—</td>
       </tr>`;
     }).join('');
@@ -1467,6 +1470,7 @@
       const placa     = document.getElementById(`input-${idx}-placa`)?.value?.trim()     || r['Placa']    || '';
       const qtReceb   = document.getElementById(`input-${idx}-qtReceb`)?.value?.trim()   || r['Qt. Indicada'] || '';
       const justif    = document.getElementById(`input-${idx}-justif`)?.value?.trim()    || r['Justificativa'] || '';
+      const residuo   = document.getElementById(`input-${idx}-residuo`)?.value?.trim()   || r['Resíduo'] || r['Residuo'] || '';
 
       if (!dataReceb) {
         if (statusEl) { statusEl.className = 'status-skip'; statusEl.textContent = '⏭ Pulado (sem data)'; }
@@ -1486,7 +1490,7 @@
         'Nome do Motorista':                     motorista,
         'Placa do Veículo':                      placa,
         'Quantidade Recebida':                   qtReceb,
-        'Código do Resíduo (IBAMA)':             r['Resíduo']                        || '',
+        'Código do Resíduo (IBAMA)':             String(residuo),
         'Código de Tecnologia':                  r['Tecnologia']                     || '',
         'Código de Estado Físico':               r['Cód. Estado Físico']             || ''
       };
@@ -1500,10 +1504,11 @@
         const ct   = res.headers.get('content-type') || '';
         const body = ct.includes('json') ? await res.json() : await res.text();
         const msg  = typeof body === 'string' ? body.trim() : (body.mensagem || JSON.stringify(body));
-        const isOk = !msg.includes('❌');
+        const isOk   = !msg.includes('❌');
+        const errMsg = msg.replace(/^[❌\s]+/, '').slice(0, 80);
         if (statusEl) {
           statusEl.className   = isOk ? 'status-ok' : 'status-err';
-          statusEl.textContent = isOk ? '✅ OK' : `❌ ${msg.slice(0, 80)}`;
+          statusEl.textContent = isOk ? '✅ OK' : `❌ ${errMsg}`;
         }
         if (isOk) ok++; else err++;
       } catch(e) {
