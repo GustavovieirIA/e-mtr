@@ -1815,9 +1815,23 @@
   }
 
   function formatDate(apiDate) {
-    if (!apiDate) return '—';
-    const s = String(apiDate);
-    if (s.length === 8) return s.slice(6,8)+'/'+s.slice(4,6)+'/'+s.slice(0,4);
+    if (apiDate === null || apiDate === undefined || apiDate === '') return '—';
+    const s = String(apiDate).trim();
+    const p = n => String(n).padStart(2, '0');
+    // yyyymmdd (FEAM) ou yyyymmddHHmmss
+    if (/^\d{8}$/.test(s) || /^\d{14}$/.test(s)) {
+      return s.slice(6,8) + '/' + s.slice(4,6) + '/' + s.slice(0,4);
+    }
+    // timestamp epoch (ms = 12+ dígitos; s = 10-11 dígitos) — API nova manda número
+    if (/^\d{10,}$/.test(s)) {
+      const d = new Date(s.length >= 12 ? Number(s) : Number(s) * 1000);
+      if (!isNaN(d.getTime())) return p(d.getUTCDate()) + '/' + p(d.getUTCMonth()+1) + '/' + d.getUTCFullYear();
+    }
+    // ISO (2026-06-05 ou 2026-06-05T00:00:00)
+    if (s.includes('-')) {
+      const d = new Date(s.length <= 10 ? s + 'T12:00:00Z' : s);
+      if (!isNaN(d.getTime())) return p(d.getUTCDate()) + '/' + p(d.getUTCMonth()+1) + '/' + d.getUTCFullYear();
+    }
     return s;
   }
 
