@@ -19,9 +19,17 @@
       color: #fff;
       padding: 16px 24px;
       box-shadow: 0 2px 8px rgba(0,0,0,.25);
+      display: flex; justify-content: space-between; align-items: center;
     }
     header h1 { font-size: 1.3rem; font-weight: 600; letter-spacing: .5px; }
     header p  { font-size: .8rem; opacity: .75; margin-top: 2px; }
+    .btn-config {
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35);
+      color: #fff; border-radius: 7px; padding: 7px 14px; cursor: pointer;
+      font-size: .83rem; white-space: nowrap; transition: background .15s;
+    }
+    .btn-config:hover { background: rgba(255,255,255,.28); }
+    .btn-config.sem-auth { background: rgba(231,76,60,.55); border-color: rgba(231,76,60,.7); }
 
     .container { max-width: 780px; margin: 32px auto; padding: 0 16px 48px; }
 
@@ -471,9 +479,42 @@
 <body>
 
 <header>
-  <h1>E-MTR — Manifesto de Transporte de Resíduos</h1>
-  <p>Sistema Eletrônico de Gerenciamento de Resíduos</p>
+  <div>
+    <h1>E-MTR — Manifesto de Transporte de Resíduos</h1>
+    <p>Sistema Eletrônico de Gerenciamento de Resíduos</p>
+  </div>
+  <button class="btn-config" id="btn-config" onclick="abrirConfig()">⚙ Configurações</button>
 </header>
+
+<!-- ===== Modal Configurações ===== -->
+<div id="modal-config" class="modal-overlay" style="display:none" onclick="if(event.target===this)fecharConfig()">
+  <div class="modal-box" style="max-width:420px">
+    <h3 style="margin:0 0 20px;color:#1a5276;font-size:1.05rem">Acesso MTR-MG</h3>
+    <p style="font-size:.82rem;color:#718096;margin:-12px 0 18px">
+      Credenciais usadas para autenticar nos workflows n8n. Salvas localmente no navegador.
+    </p>
+    <div class="field">
+      <label>Pessoa Código</label>
+      <input type="number" id="cfg-pessoaCodigo" placeholder="Ex.: 176165">
+    </div>
+    <div class="field">
+      <label>CNPJ</label>
+      <input type="text" id="cfg-pessoaCnpj" placeholder="00000000000000" maxlength="18">
+    </div>
+    <div class="field">
+      <label>CPF do Usuário</label>
+      <input type="text" id="cfg-usuarioCpf" placeholder="00000000000" maxlength="14">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="cfg-senha" placeholder="Senha de acesso">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="btn-modal-cancel" onclick="fecharConfig()">Cancelar</button>
+      <button class="btn-modal-baixa" onclick="salvarConfig()">Salvar</button>
+    </div>
+  </div>
+</div>
 
 <div class="container">
   <div class="tabs">
@@ -866,9 +907,50 @@
 
 <script>
   // ── Webhook URLs ─────────────────────────────────────────────────────────────
-  const WEBHOOK_EMITIR = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/831fe3a5-9651-4b0f-9afd-e889cca332e6';
+  const WEBHOOK_EMITIR   = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/831fe3a5-9651-4b0f-9afd-e889cca332e6';
   const WEBHOOK_BAIXA    = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/e2ee3b8d-8e87-4a68-92de-8f632f257538';
   const WEBHOOK_CONSULTA = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/c7e4a2f1-3b8d-4c9e-a5f2-d1b6c8e3f7a4';
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // ── Configurações de acesso ──────────────────────────────────────────────────
+  function getAuth() {
+    return JSON.parse(localStorage.getItem('mtr_auth') || '{}');
+  }
+
+  function _atualizaBtnConfig() {
+    const c = getAuth();
+    const ok = c.pessoaCodigo && c.pessoaCnpj && c.usuarioCpf && c.senha;
+    const btn = document.getElementById('btn-config');
+    if (!btn) return;
+    btn.classList.toggle('sem-auth', !ok);
+    btn.textContent = ok ? '⚙ Configurações' : '⚠ Configurar Acesso';
+  }
+
+  function abrirConfig() {
+    const c = getAuth();
+    document.getElementById('cfg-pessoaCodigo').value = c.pessoaCodigo || '';
+    document.getElementById('cfg-pessoaCnpj').value   = c.pessoaCnpj   || '';
+    document.getElementById('cfg-usuarioCpf').value   = c.usuarioCpf   || '';
+    document.getElementById('cfg-senha').value        = c.senha        || '';
+    document.getElementById('modal-config').style.display = 'flex';
+  }
+
+  function fecharConfig() {
+    document.getElementById('modal-config').style.display = 'none';
+  }
+
+  function salvarConfig() {
+    const cod   = parseInt(document.getElementById('cfg-pessoaCodigo').value);
+    const cnpj  = document.getElementById('cfg-pessoaCnpj').value.replace(/\D/g, '');
+    const cpf   = document.getElementById('cfg-usuarioCpf').value.replace(/\D/g, '');
+    const senha = document.getElementById('cfg-senha').value.trim();
+    if (!cod || !cnpj || !cpf || !senha) { alert('Preencha todos os campos.'); return; }
+    localStorage.setItem('mtr_auth', JSON.stringify({ pessoaCodigo: cod, pessoaCnpj: cnpj, usuarioCpf: cpf, senha }));
+    fecharConfig();
+    _atualizaBtnConfig();
+  }
+
+  window.addEventListener('DOMContentLoaded', _atualizaBtnConfig);
   // ─────────────────────────────────────────────────────────────────────────────
 
   // ── Tabelas de domínio ───────────────────────────────────────────────────────
@@ -1116,7 +1198,7 @@
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(clean),
+        body: JSON.stringify({ ...clean, auth: getAuth() }),
       });
       let body;
       const ct = res.headers.get('content-type') || '';
@@ -1275,7 +1357,7 @@
       const res  = await fetch(WEBHOOK_BAIXA, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ ...payload, auth: getAuth() })
       });
       const ct   = res.headers.get('content-type') || '';
       const body = ct.includes('json') ? await res.json() : await res.text();
@@ -1499,7 +1581,7 @@
         const res  = await fetch(WEBHOOK_BAIXA, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ ...payload, auth: getAuth() })
         });
         const ct   = res.headers.get('content-type') || '';
         const body = ct.includes('json') ? await res.json() : await res.text();
@@ -1724,7 +1806,7 @@
       const res = await fetch(WEBHOOK_CONSULTA, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fimMaisUm(fim)) })
+        body: JSON.stringify({ dataInicio: toAPIDate(inicio), dataFim: toAPIDate(fimMaisUm(fim)), auth: getAuth() })
       });
       const ct = res.headers.get('content-type') || '';
       const body = ct.includes('json') ? await res.json() : await res.text();
