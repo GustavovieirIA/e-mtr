@@ -457,6 +457,7 @@
     .status-err  { color: #c0392b; font-weight: 600; font-size: .77rem; }
     .status-skip { color: #e67e22; font-size: .77rem; }
   </style>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -768,7 +769,7 @@
       <div id="consulta-results" style="display:none">
         <div class="results-meta">
           <span class="results-count" id="results-count"></span>
-          <button class="btn-export" onclick="exportarCSV()">⬇ Exportar CSV</button>
+          <button class="btn-export" onclick="exportarCSV()">⬇ Exportar Excel</button>
         </div>
         <div class="results-table-wrap">
           <table class="results-table" id="results-table">
@@ -1555,16 +1556,7 @@
     if (!_ultimoResultado.length) return;
 
     const UNIT_MAP = { 1: 'm³', 2: 'L', 3: 'kg', 4: 't', 5: 'Un' };
-    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-    // ┌─ Identificação ────────────────────────────────────────────────────────┐
-    // │ Nº MTR | Data Emissão | CNPJ Ger | Nome Ger | CNPJ Transp | Nome Transp | Situação │
-    // ├─ Preencher / Conferir (colunas adjacentes) ─────────────────────────────┤
-    // │ Data Receb | Motorista | Placa | Responsável | Cargo │
-    // │ Qt. Indicada | Qt. Recebida | Unidade | Tecnologia | Justificativa │
-    // ├─ Técnico (sistema) ─────────────────────────────────────────────────────┤
-    // │ Resíduo | Cód. Estado Físico │
-    // └────────────────────────────────────────────────────────────────────────┘
     const headers = [
       'Nº MTR', 'Data Emissão', 'CNPJ Gerador', 'Nome Gerador',
       'CNPJ Transportador', 'Nome Transportador', 'Situação',
@@ -1574,47 +1566,54 @@
       'Resíduo', 'Cód. Estado Físico'
     ];
 
-    const rows = _ultimoResultado.map(m => {
-      const cg         = m.cnpGerador       ?? '';
-      const ct         = m.cnpTransportador  ?? '';
-      const nomeGer    = _nomeMap[cg]       || '';
-      const nomeTransp = _nomeMap[ct]       || '';
-      const fi         = (m.itens || [])[0] || {};
+    const dataRows = _ultimoResultado.map(m => {
+      const cg         = m.cnpGerador        ?? '';
+      const ct         = m.cnpTransportador   ?? '';
+      const nomeGer    = _nomeMap[cg]        || '';
+      const nomeTransp = _nomeMap[ct]        || '';
+      const fi         = (m.itens || [])[0]  || {};
       const motorista  = (m.nomeMotorista?.trim()) || 'Claudio';
       const unidade    = UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '');
       return [
-        // ── Identificação (somente leitura) ──────────────────────────────────
         m.manifestoCodigo ?? '',
-        q(formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao)),
-        cg,
-        q(nomeGer),
-        ct,
-        q(nomeTransp),
-        q(m.situacao ?? 'Emitido (aguarda baixa)'),
-        // ── Preencher / Conferir ─────────────────────────────────────────────
-        q(''),                          // Data de recebimento — operador preenche
-        q(motorista),
-        q(m.placaVeiculo ?? ''),
-        q('Victoria Abrahão'),
-        q('Analista ambiental'),
-        fi.quantidade       ?? '',      // Qt. Indicada — vem do sistema
-        q(''),                          // Qt. Recebida  — operador preenche
-        q(unidade),
+        formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
+        cg ? String(cg) : '',
+        nomeGer,
+        ct ? String(ct) : '',
+        nomeTransp,
+        m.situacao ?? 'Emitido (aguarda baixa)',
+        '',                         // Data de recebimento — operador preenche
+        motorista,
+        m.placaVeiculo ?? '',
+        'Victoria Abrahão',
+        'Analista ambiental',
+        fi.quantidade       ?? '',  // Qt. Indicada — sistema
+        '',                         // Qt. Recebida  — operador preenche
+        unidade,
         fi.codigoTecnologia ?? '',
-        q('Peso apurado em balança'),
-        // ── Técnico ──────────────────────────────────────────────────────────
-        q(fi.residuo        ?? ''),
+        'Peso apurado em balança',
+        fi.residuo          ?? '',
         fi.codigoTipoEstado ?? ''
-      ].join(';');
+      ];
     });
 
-    const csv  = [headers.map(q).join(';'), ...rows].join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
+    const aoa = [headers, ...dataRows];
+    const ws  = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Larguras aproximadas por coluna
+    ws['!cols'] = [
+      {wch:14},{wch:12},{wch:16},{wch:30},
+      {wch:16},{wch:30},{wch:24},
+      {wch:18},{wch:16},{wch:10},
+      {wch:22},{wch:20},
+      {wch:12},{wch:12},{wch:8},{wch:10},{wch:24},
+      {wch:12},{wch:14}
+    ];
+
+    const wb   = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'MTRs Pendentes');
     const data = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
-    a.href = url; a.download = `MTRs_pendentes_${data}.csv`; a.click();
-    URL.revokeObjectURL(url);
+    XLSX.writeFile(wb, `MTRs_pendentes_${data}.xlsx`);
   }
 
   async function submitConsulta() {
