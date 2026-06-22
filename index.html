@@ -1464,31 +1464,57 @@
     if (!responsavel) { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe o Nome do Responsável.</span>'; return; }
     if (!cargo)       { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe o Cargo do Responsável.</span>'; return; }
 
-    const itens = (m.itens || []).map((it, i) => ({
-      codigoSequencial: it.codigoSequencial,
-      qtdRecebida: parseFloat(document.getElementById('m-qtd-' + i).value) || it.quantidade,
-      residuo: it.residuo,
-      codigoTecnologia: it.codigoTecnologia,
-      codigoTipoEstado: it.codigoTipoEstado
-    }));
+    const qtd = i => parseFloat(document.getElementById('m-qtd-' + i).value) || (m.itens[i] || {}).quantidade;
 
-    const payload = {
-      'Número do Manifesto (10 dígitos)': String(m.manifestoCodigo),
-      'CNPJ do Gerador':                  m.cnpGerador    || '',
-      'CNPJ do Transportador':            m.cnpTransportador || '',
-      'Nome do Responsável pelo Recebimento': responsavel,
-      'Cargo do Responsável':             cargo,
-      'Data de Recebimento (AAAAMMDD)':   dataReceb.replace(/-/g, ''),
-      'Observações do Recebimento':       obs,
-      'Nome do Motorista':                motorista,
-      'Placa do Veículo':                 placa,
-      // Mantém campos individuais para compatibilidade com o workflow atual
-      'Quantidade Recebida':              itens[0]?.qtdRecebida ?? '',
-      'Código do Resíduo (IBAMA)':        itens[0]?.residuo     ?? '',
-      'Código de Tecnologia':             itens[0]?.codigoTecnologia  ?? '',
-      'Código de Estado Físico':          itens[0]?.codigoTipoEstado  ?? '',
-      'itens': itens
-    };
+    let corpo;
+    if (dialetoAtivo() === 'sinir') {
+      // API nova: receberManifestoLote — usa os códigos vindos da consulta (em memória)
+      corpo = {
+        manNumero:                  String(m.manifestoCodigo),
+        dataRecebimento:            dataReceb.replace(/-/g, ''),
+        nomeMotorista:              motorista,
+        placaVeiculo:               placa,
+        nomeResponsavelRecebimento: responsavel,
+        observacoes:                obs,
+        itens: (m.itens || []).map((it, i) => ({
+          resCodigoIbama:        it.residuo,
+          marQuantidade:         it.quantidade,
+          marQuantidadeRecebida: qtd(i),
+          traCodigo:             it.codigoTecnologia,
+          uniCodigo:             it.codigoUnidade,
+          tieCodigo:             it.codigoTipoEstado,
+          tiaCodigo:             it.codigoAcondicionamento,
+          claCodigo:             it.codigoClasse,
+          marJustificativa:      obs || 'Peso apurado em balança'
+        })),
+        ...getAuthPayload()
+      };
+    } else {
+      const itens = (m.itens || []).map((it, i) => ({
+        codigoSequencial: it.codigoSequencial,
+        qtdRecebida: qtd(i),
+        residuo: it.residuo,
+        codigoTecnologia: it.codigoTecnologia,
+        codigoTipoEstado: it.codigoTipoEstado
+      }));
+      corpo = {
+        'Número do Manifesto (10 dígitos)': String(m.manifestoCodigo),
+        'CNPJ do Gerador':                  m.cnpGerador    || '',
+        'CNPJ do Transportador':            m.cnpTransportador || '',
+        'Nome do Responsável pelo Recebimento': responsavel,
+        'Cargo do Responsável':             cargo,
+        'Data de Recebimento (AAAAMMDD)':   dataReceb.replace(/-/g, ''),
+        'Observações do Recebimento':       obs,
+        'Nome do Motorista':                motorista,
+        'Placa do Veículo':                 placa,
+        'Quantidade Recebida':              itens[0]?.qtdRecebida ?? '',
+        'Código do Resíduo (IBAMA)':        itens[0]?.residuo     ?? '',
+        'Código de Tecnologia':             itens[0]?.codigoTecnologia  ?? '',
+        'Código de Estado Físico':          itens[0]?.codigoTipoEstado  ?? '',
+        'itens': itens,
+        ...getAuthPayload()
+      };
+    }
 
     const btn = document.getElementById('btn-confirmar-baixa');
     btn.disabled = true; btn.textContent = 'Enviando…';
@@ -1498,7 +1524,7 @@
       const res  = await fetch(webhookURL('baixa'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, ...getAuthPayload() })
+        body: JSON.stringify(corpo)
       });
       const ct   = res.headers.get('content-type') || '';
       const body = ct.includes('json') ? await res.json() : await res.text();
