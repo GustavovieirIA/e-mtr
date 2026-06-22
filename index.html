@@ -1565,8 +1565,9 @@
   }
 
   function _parseCSV(text) {
-    text = text.replace(/^\uFEFF/, '').replace(/\r/g, '');
-    const lines = text.split('\n').filter(l => l.trim());
+    text = text.replace(/^\uFEFF/, '');
+    // Aceita qualquer quebra de linha: \r\n (Windows), \r (Excel no Mac) e \n (Unix)
+    const lines = text.split(/\r\n|\r|\n/).filter(l => l.trim());
     if (lines.length < 2) return [];
     const headers = _parseCSVLine(lines[0]).map(h => {
       h = h.trim();
@@ -1728,21 +1729,37 @@
 
       if (statusEl) { statusEl.className = 'status-wait'; statusEl.textContent = '⏳ Enviando…'; }
 
-      const payload = {
-        'Número do Manifesto (10 dígitos)':     _getMTR(r),
-        'CNPJ do Gerador':                       _normalizeCNPJ(r['CNPJ Gerador']),
-        'CNPJ do Transportador':                 _normalizeCNPJ(r['CNPJ Transportador']),
-        'Nome do Responsável pelo Recebimento':  r['Responsável pelo recebimento']   || 'Victoria Abrahão',
-        'Cargo do Responsável':                  r['Cargo']                          || 'Analista ambiental',
-        'Data de Recebimento (AAAAMMDD)':        _csvDateToAPI(dataReceb),
-        'Observações do Recebimento':            justif,
-        'Nome do Motorista':                     motorista,
-        'Placa do Veículo':                      placa,
-        'Quantidade Recebida':                   qtReceb,
-        'Código do Resíduo (IBAMA)':             String(residuo),
-        'Código de Tecnologia':                  r['Tecnologia']                     || '',
-        'Código de Estado Físico':               r['Cód. Estado Físico']             || ''
-      };
+      let payload;
+      if (dialetoAtivo() === 'sinir') {
+        // SINIR: o workflow consulta o MTR e pega os códigos sozinho.
+        // Mandamos só número + quantidade recebida + data + dados do recebimento.
+        payload = {
+          manNumero:                  _getMTR(r),
+          dataRecebimento:            _csvDateToAPI(dataReceb),   // AAAAMMDD; workflow converte p/ epoch
+          qtdRecebida:                qtReceb,
+          nomeMotorista:              motorista,
+          placaVeiculo:               placa,
+          nomeResponsavelRecebimento: r['Responsável pelo recebimento'] || 'Victoria Abrahão',
+          observacoes:                justif,
+          justificativa:              justif
+        };
+      } else {
+        payload = {
+          'Número do Manifesto (10 dígitos)':     _getMTR(r),
+          'CNPJ do Gerador':                       _normalizeCNPJ(r['CNPJ Gerador']),
+          'CNPJ do Transportador':                 _normalizeCNPJ(r['CNPJ Transportador']),
+          'Nome do Responsável pelo Recebimento':  r['Responsável pelo recebimento']   || 'Victoria Abrahão',
+          'Cargo do Responsável':                  r['Cargo']                          || 'Analista ambiental',
+          'Data de Recebimento (AAAAMMDD)':        _csvDateToAPI(dataReceb),
+          'Observações do Recebimento':            justif,
+          'Nome do Motorista':                     motorista,
+          'Placa do Veículo':                      placa,
+          'Quantidade Recebida':                   qtReceb,
+          'Código do Resíduo (IBAMA)':             String(residuo),
+          'Código de Tecnologia':                  r['Tecnologia']                     || '',
+          'Código de Estado Físico':               r['Cód. Estado Físico']             || ''
+        };
+      }
 
       try {
         const res  = await fetch(webhookURL('baixa'), {
