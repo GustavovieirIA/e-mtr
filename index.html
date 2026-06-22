@@ -1853,8 +1853,14 @@
     wrap.style.display = 'block';
     document.getElementById('resp-consulta').className = 'response-box';
 
-    // Busca nomes em lotes de 4 com pausa entre eles (evita rate limit da BrasilAPI)
-    const cnpjs = [...new Set(manifests.flatMap(m => [m.cnpGerador, m.cnpTransportador].filter(Boolean)))];
+    // SINIR já manda os nomes (parDescricao) — semeia o cache pra não rebuscar.
+    manifests.forEach(m => {
+      if (m.nomeGerador && m.cnpGerador)             _nomeMap[m.cnpGerador]      = m.nomeGerador;
+      if (m.nomeTransportador && m.cnpTransportador) _nomeMap[m.cnpTransportador] = m.nomeTransportador;
+    });
+    // BrasilAPI só para CNPJs ainda sem nome (caso do FEAM)
+    const cnpjs = [...new Set(manifests.flatMap(m => [m.cnpGerador, m.cnpTransportador].filter(Boolean)))]
+      .filter(c => !_nomeMap[c]);
     for (let i = 0; i < cnpjs.length; i += 4) {
       await Promise.all(cnpjs.slice(i, i + 4).map(fetchNomeCNPJ));
       if (i + 4 < cnpjs.length) await new Promise(r => setTimeout(r, 600));
@@ -1866,8 +1872,8 @@
       const dataEmis   = formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao);
       const cnpjGer    = m.cnpGerador    ?? '—';
       const cnpjTransp = m.cnpTransportador ?? '—';
-      const nomeGer    = _nomeMap[cnpjGer]    || cnpjGer;
-      const nomeTransp = _nomeMap[cnpjTransp] || cnpjTransp;
+      const nomeGer    = m.nomeGerador       || _nomeMap[cnpjGer]    || cnpjGer;
+      const nomeTransp = m.nomeTransportador || _nomeMap[cnpjTransp] || cnpjTransp;
       const situacao   = situacaoBadge(m.situacaoManifestoCodigo ?? m.situacao ?? m.manifSituacao ?? m.status);
       const mStr = JSON.stringify(m).replace(/'/g,"\\'").replace(/`/g,'\\`');
       return `<tr data-mtr="${m.manifestoCodigo ?? m.codigo}">
@@ -1904,8 +1910,8 @@
     const dataRows = _ultimoResultado.map(m => {
       const cg         = m.cnpGerador        ?? '';
       const ct         = m.cnpTransportador   ?? '';
-      const nomeGer    = _nomeMap[cg]        || '';
-      const nomeTransp = _nomeMap[ct]        || '';
+      const nomeGer    = m.nomeGerador       || _nomeMap[cg] || '';
+      const nomeTransp = m.nomeTransportador || _nomeMap[ct] || '';
       const fi         = (m.itens || [])[0]  || {};
       const motorista  = (m.nomeMotorista?.trim()) || 'Claudio';
       const unidade    = UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '');
