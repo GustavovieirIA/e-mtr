@@ -1318,13 +1318,38 @@
     text = text.replace(/^\uFEFF/, '').replace(/\r/g, '');
     const lines = text.split('\n').filter(l => l.trim());
     if (lines.length < 2) return [];
-    const headers = _parseCSVLine(lines[0]).map(h => h.trim());
+    const headers = _parseCSVLine(lines[0]).map(h => {
+      h = h.trim();
+      // Normaliza cabe\u00E7alhos com encoding corrompido: "N? MTR", "N\u00BA MTR", etc.
+      h = h.replace(/^N[^a-zA-Z ]*\s*MTR$/i, 'N\u00BA MTR');
+      h = h.replace(/Emiss[^a-zA-Z]o/i,   'Emiss\u00E3o');
+      h = h.replace(/Situa[^a-zA-Z]o/i,   'Situa\u00E7\u00E3o');
+      h = h.replace(/Respons[^a-zA-Z]vel/i,'Respons\u00E1vel');
+      h = h.replace(/balan[^a-zA-Z]/i,    'balan\u00E7a');
+      return h;
+    });
     return lines.slice(1).map(line => {
       const vals = _parseCSVLine(line);
       const row = {};
       headers.forEach((h, i) => row[h] = (vals[i] ?? '').trim());
       return row;
     });
+  }
+
+  function _normalizeCNPJ(val) {
+    if (!val) return '';
+    const s = String(val).trim();
+    if (/[Ee][+]?\d/.test(s)) {
+      // Nota\u00E7\u00E3o cient\u00EDfica do Excel (ex: "1,92E+13") \u2014 converte melhor poss\u00EDvel
+      const n = parseFloat(s.replace(',', '.'));
+      return isNaN(n) ? '' : String(Math.round(n));
+    }
+    return s.replace(/\D/g, '');
+  }
+
+  function _getMTR(r) {
+    // Primeira coluna \u00E9 sempre N\u00BA MTR; nome pode estar garbled
+    return (r['N\u00BA MTR'] || Object.values(r)[0] || '').trim();
   }
 
   function _csvDateToAPI(d) {
@@ -1351,13 +1376,16 @@
           return out;
         });
       } else {
-        _csvRows = _parseCSV(e.target.result);
+        // Detecta encoding: UTF-8 (com ou sem BOM) → fallback Windows-1252
+        const bytes = new Uint8Array(e.target.result);
+        let text = new TextDecoder('utf-8').decode(bytes);
+        if (text.includes('�')) text = new TextDecoder('windows-1252').decode(bytes);
+        _csvRows = _parseCSV(text);
       }
       if (!_csvRows.length) { alert('Arquivo vazio ou inválido.'); return; }
       _renderCSVPreview();
     };
-    if (isXlsx) reader.readAsArrayBuffer(file);
-    else reader.readAsText(file, 'UTF-8');
+    reader.readAsArrayBuffer(file);
   }
 
   function _renderCSVPreview() {
@@ -1368,7 +1396,7 @@
       const nomeTransp = r['Nome Transportador'] || r['CNPJ Transportador'] || '—';
       const esc = s => String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
       return `<tr id="massa-row-${i}">
-        <td><strong>${r['Nº MTR'] || '—'}</strong></td>
+        <td><strong>${_getMTR(r) || '—'}</strong></td>
         <td style="font-size:.78rem;white-space:nowrap">${r['Data Emissão'] || '—'}</td>
         <td style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeGer)}">${nomeGer}</td>
         <td style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeTransp)}">${nomeTransp}</td>
@@ -1409,10 +1437,9 @@
   }
 
   async function processarBaixasMassa() {
-    const rows = _csvRows.filter(r => r['Nº MTR']?.trim());
+    const rows = _csvRows.filter(r => _getMTR(r));
     if (!rows.length) return;
 
-    // conta linhas sem data usando os valores actuais dos inputs (podem ter sido editados)
     const rowIdxs = rows.map(r => _csvRows.indexOf(r));
     const semData = rowIdxs.filter(i =>
       !(document.getElementById(`input-${i}-dataReceb`)?.value?.trim())
@@ -1449,9 +1476,9 @@
       if (statusEl) { statusEl.className = 'status-wait'; statusEl.textContent = '⏳ Enviando…'; }
 
       const payload = {
-        'Número do Manifesto (10 dígitos)':     r['Nº MTR'],
-        'CNPJ do Gerador':                       r['CNPJ Gerador']                  || '',
-        'CNPJ do Transportador':                 r['CNPJ Transportador']             || '',
+        'Número do Manifesto (10 dígitos)':     _getMTR(r),
+        'CNPJ do Gerador':                       _normalizeCNPJ(r['CNPJ Gerador']),
+        'CNPJ do Transportador':                 _normalizeCNPJ(r['CNPJ Transportador']),
         'Nome do Responsável pelo Recebimento':  r['Responsável pelo recebimento']   || 'Victoria Abrahão',
         'Cargo do Responsável':                  r['Cargo']                          || 'Analista ambiental',
         'Data de Recebimento (AAAAMMDD)':        _csvDateToAPI(dataReceb),
