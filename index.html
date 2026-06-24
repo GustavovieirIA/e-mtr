@@ -3,15 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>E-MTR</title>
+  <title>E-MTR · União Recicláveis</title>
+  <link rel="icon" type="image/png" href="logo-uniao.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f0f2f5;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #eef1f4;
       color: #1a1a2e;
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
 
     header {
@@ -69,7 +75,7 @@
       font-size: .9rem;
       font-weight: 500;
       cursor: pointer;
-      border-radius: 6px 6px 0 0;
+      border-radius: 9px 9px 0 0;
       transition: background .15s, color .15s;
     }
     .tab-btn:hover { background: #cfd7e0; }
@@ -82,10 +88,10 @@
 
     .card {
       background: #fff;
-      border: 1px solid #c8d0d8;
-      border-radius: 0 6px 6px 6px;
-      padding: 28px 32px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+      border: 1px solid #dce3ea;
+      border-radius: 0 12px 12px 12px;
+      padding: 30px 34px;
+      box-shadow: 0 6px 24px rgba(15,77,43,.07);
     }
 
     .tab-panel { display: none; }
@@ -111,19 +117,20 @@
     label .opt { font-weight: 400; color: #a0aec0; font-size: .72rem; }
 
     input, textarea, select {
-      padding: 8px 11px;
+      padding: 10px 12px;
       border: 1px solid #cbd5e0;
-      border-radius: 5px;
+      border-radius: 8px;
       font-size: .88rem;
       color: #1a1a2e;
       background: #f7f9fc;
-      transition: border-color .15s, box-shadow .15s;
+      transition: border-color .15s, box-shadow .15s, background .15s;
       width: 100%;
     }
+    input:hover:not(:focus), textarea:hover:not(:focus), select:hover:not(:focus) { border-color: #9fb3c8; }
     input:focus, textarea:focus, select:focus {
       outline: none;
       border-color: #15663a;
-      box-shadow: 0 0 0 3px rgba(26,82,118,.12);
+      box-shadow: 0 0 0 3px rgba(21,102,58,.18);
       background: #fff;
     }
     .cnpj-group { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -164,14 +171,16 @@
       font-size: .95rem;
       font-weight: 600;
       cursor: pointer;
-      transition: background .15s, opacity .15s;
+      box-shadow: 0 2px 8px rgba(15,77,43,.18);
+      transition: background .15s, transform .12s, box-shadow .15s, opacity .15s;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
     }
-    .btn-submit:hover:not(:disabled) { background: #0f4d2b; }
-    .btn-submit:disabled { opacity: .65; cursor: not-allowed; }
+    .btn-submit:hover:not(:disabled) { background: #0f4d2b; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(15,77,43,.28); }
+    .btn-submit:active:not(:disabled) { transform: translateY(0); box-shadow: 0 2px 8px rgba(15,77,43,.18); }
+    .btn-submit:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
 
     .spinner {
       width: 16px; height: 16px;
@@ -220,7 +229,7 @@
     .combo-input:focus {
       outline: none;
       border-color: #15663a;
-      box-shadow: 0 0 0 3px rgba(26,82,118,.12);
+      box-shadow: 0 0 0 3px rgba(21,102,58,.18);
       background-color: #fff;
     }
     .combo-dropdown {
@@ -313,7 +322,7 @@
     }
     input[type="date"]:focus {
       outline: none; border-color: #15663a;
-      box-shadow: 0 0 0 3px rgba(26,82,118,.12); background: #fff;
+      box-shadow: 0 0 0 3px rgba(21,102,58,.18); background: #fff;
     }
     .btn-search {
       padding: 9px 20px;
@@ -340,16 +349,17 @@
     }
     .btn-export:hover { background: #1e4d19; }
 
-    .results-table-wrap { overflow-x: auto; }
+    .results-table-wrap { overflow: auto; max-height: 540px; border-radius: 10px; border: 1px solid #e8ecf0; }
     .results-table {
       width: 100%; border-collapse: collapse;
       font-size: .82rem;
     }
     .results-table th {
       background: #15663a; color: #fff;
-      padding: 9px 10px; text-align: left;
+      padding: 11px 10px; text-align: left;
       font-size: .75rem; font-weight: 700;
       letter-spacing: .4px; white-space: nowrap;
+      position: sticky; top: 0; z-index: 2;
     }
     .results-table td {
       padding: 8px 10px;
@@ -409,7 +419,7 @@
     }
     .modal-fields input:focus, .modal-fields textarea:focus {
       outline: none; border-color: #15663a;
-      box-shadow: 0 0 0 3px rgba(26,82,118,.12); background: #fff;
+      box-shadow: 0 0 0 3px rgba(21,102,58,.18); background: #fff;
     }
     .modal-section-title {
       font-size: .78rem; font-weight: 700; color: #4a5568;
