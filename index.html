@@ -15,14 +15,19 @@
     }
 
     header {
-      background: #1a5276;
+      background: linear-gradient(100deg, #0f4d2b 0%, #15663a 55%, #1c7a45 100%);
       color: #fff;
       padding: 16px 24px;
       box-shadow: 0 2px 8px rgba(0,0,0,.25);
       display: flex; justify-content: space-between; align-items: center;
     }
     header h1 { font-size: 1.3rem; font-weight: 600; letter-spacing: .5px; }
-    header p  { font-size: .8rem; opacity: .75; margin-top: 2px; }
+    header p  { font-size: .8rem; opacity: .8; margin-top: 2px; }
+    .brand { display: flex; align-items: center; gap: 16px; min-width: 0; }
+    .brand-logo {
+      height: 50px; width: auto; background: #fff; border-radius: 9px;
+      padding: 7px 11px; box-shadow: 0 2px 6px rgba(0,0,0,.2); flex-shrink: 0;
+    }
     .btn-config {
       background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35);
       color: #fff; border-radius: 7px; padding: 7px 14px; cursor: pointer;
@@ -41,10 +46,18 @@
     .sistema-sel option { color: #1a2530; }
     @media (max-width: 560px) {
       header { flex-direction: column; gap: 12px; align-items: stretch; }
+      .brand { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .brand-logo { height: 44px; }
+      header h1 { font-size: 1.1rem; }
       .header-actions { justify-content: space-between; }
     }
 
-    .container { max-width: 780px; margin: 32px auto; padding: 0 16px 48px; }
+    .container { max-width: 780px; margin: 32px auto; padding: 0 16px 24px; }
+    .site-footer {
+      text-align: center; padding: 18px 16px 28px; color: #a0aec0;
+      font-size: .74rem; letter-spacing: .3px;
+    }
+    .site-footer strong { color: #15663a; font-weight: 600; }
 
     .tabs { display: flex; gap: 4px; margin-bottom: -1px; }
     .tab-btn {
@@ -62,7 +75,7 @@
     .tab-btn:hover { background: #cfd7e0; }
     .tab-btn.active {
       background: #fff;
-      color: #1a5276;
+      color: #15663a;
       border-color: #c8d0d8;
       font-weight: 600;
     }
@@ -109,7 +122,7 @@
     }
     input:focus, textarea:focus, select:focus {
       outline: none;
-      border-color: #1a5276;
+      border-color: #15663a;
       box-shadow: 0 0 0 3px rgba(26,82,118,.12);
       background: #fff;
     }
@@ -127,8 +140,8 @@
       white-space: nowrap;
       line-height: 1.3;
     }
-    .cnpj-btn:hover { border-color: #1a5276; color: #1a5276; background: #ebf0f7; }
-    .cnpj-btn.active { border-color: #1a5276; background: #1a5276; color: #fff; }
+    .cnpj-btn:hover { border-color: #15663a; color: #15663a; background: #eaf4ec; }
+    .cnpj-btn.active { border-color: #15663a; background: #15663a; color: #fff; }
     .cnpj-btn small { display: block; font-weight: 400; font-size: .72rem; opacity: .8; }
 
     select { cursor: pointer; appearance: none;
@@ -144,7 +157,7 @@
       margin-top: 24px;
       width: 100%;
       padding: 12px;
-      background: #1a5276;
+      background: #15663a;
       color: #fff;
       border: none;
       border-radius: 6px;
@@ -157,7 +170,7 @@
       justify-content: center;
       gap: 8px;
     }
-    .btn-submit:hover:not(:disabled) { background: #154360; }
+    .btn-submit:hover:not(:disabled) { background: #0f4d2b; }
     .btn-submit:disabled { opacity: .65; cursor: not-allowed; }
 
     .spinner {
@@ -206,7 +219,7 @@
     }
     .combo-input:focus {
       outline: none;
-      border-color: #1a5276;
+      border-color: #15663a;
       box-shadow: 0 0 0 3px rgba(26,82,118,.12);
       background-color: #fff;
     }
@@ -230,11 +243,11 @@
       transition: background .1s;
     }
     .combo-item:last-child { border-bottom: none; }
-    .combo-item:hover, .combo-item.hi { background: #ebf0f7; }
+    .combo-item:hover, .combo-item.hi { background: #eaf4ec; }
     .combo-code {
       font-weight: 700;
       font-size: .78rem;
-      color: #1a5276;
+      color: #15663a;
       font-family: monospace;
       letter-spacing: .5px;
       margin-right: 6px;
@@ -265,9 +278,9 @@
       margin-bottom: 20px;
       padding: 10px 16px;
       background: #fff;
-      border: 1.5px dashed #1a5276;
+      border: 1.5px dashed #15663a;
       border-radius: 6px;
-      color: #1a5276;
+      color: #15663a;
       font-size: .88rem;
       font-weight: 600;
       cursor: pointer;
@@ -276,7 +289,7 @@
       gap: 8px;
       align-items: center;
     }
-    .btn-replicate:hover { background: #ebf0f7; }
+    .btn-replicate:hover { background: #eaf4ec; }
     .btn-replicate .rep-meta {
       display: block;
       font-weight: 400;
@@ -299,18 +312,18 @@
       transition: border-color .15s, box-shadow .15s;
     }
     input[type="date"]:focus {
-      outline: none; border-color: #1a5276;
+      outline: none; border-color: #15663a;
       box-shadow: 0 0 0 3px rgba(26,82,118,.12); background: #fff;
     }
     .btn-search {
       padding: 9px 20px;
-      background: #1a5276; color: #fff;
+      background: #15663a; color: #fff;
       border: none; border-radius: 5px;
       font-size: .88rem; font-weight: 600;
       cursor: pointer; white-space: nowrap;
       transition: background .15s;
     }
-    .btn-search:hover:not(:disabled) { background: #154360; }
+    .btn-search:hover:not(:disabled) { background: #0f4d2b; }
     .btn-search:disabled { opacity: .6; cursor: not-allowed; }
 
     .results-meta {
@@ -333,7 +346,7 @@
       font-size: .82rem;
     }
     .results-table th {
-      background: #1a5276; color: #fff;
+      background: #15663a; color: #fff;
       padding: 9px 10px; text-align: left;
       font-size: .75rem; font-weight: 700;
       letter-spacing: .4px; white-space: nowrap;
@@ -345,7 +358,7 @@
     }
     .results-table tr:last-child td { border-bottom: none; }
     .results-table tr:nth-child(even) td { background: #f7f9fc; }
-    .results-table tr:hover td { background: #ebf0f7; }
+    .results-table tr:hover td { background: #eaf4ec; }
     .badge {
       display: inline-block; padding: 2px 8px;
       border-radius: 10px; font-size: .72rem; font-weight: 700;
@@ -395,7 +408,7 @@
       background: #f7f9fc; box-sizing: border-box;
     }
     .modal-fields input:focus, .modal-fields textarea:focus {
-      outline: none; border-color: #1a5276;
+      outline: none; border-color: #15663a;
       box-shadow: 0 0 0 3px rgba(26,82,118,.12); background: #fff;
     }
     .modal-section-title {
@@ -423,19 +436,19 @@
       font-size: .85rem; cursor: pointer;
     }
     .btn-modal-baixa {
-      padding: 8px 22px; background: #1a5276; color: #fff;
+      padding: 8px 22px; background: #15663a; color: #fff;
       border: none; border-radius: 5px; font-size: .85rem;
       font-weight: 700; cursor: pointer; transition: background .15s;
     }
-    .btn-modal-baixa:hover:not(:disabled) { background: #154360; }
+    .btn-modal-baixa:hover:not(:disabled) { background: #0f4d2b; }
     .btn-modal-baixa:disabled { opacity: .6; cursor: not-allowed; }
     .modal-resp { margin-top: 10px; font-size: .85rem; }
     .btn-baixa-row {
-      padding: 5px 12px; background: #1a5276; color: #fff;
+      padding: 5px 12px; background: #15663a; color: #fff;
       border: none; border-radius: 4px; font-size: .76rem;
       font-weight: 700; cursor: pointer; white-space: nowrap;
     }
-    .btn-baixa-row:hover { background: #154360; }
+    .btn-baixa-row:hover { background: #0f4d2b; }
     @media (max-width: 560px) {
       .modal-fields { grid-template-columns: 1fr; }
       .modal-info-grid { grid-template-columns: 1fr; }
@@ -451,15 +464,15 @@
       transition: border-color .15s, background .15s; margin-bottom: 14px;
     }
     .upload-area:hover, .upload-area.drag-over {
-      border-color: #1a5276; background: #f0f4f8; color: #1a5276;
+      border-color: #15663a; background: #f0f4f8; color: #15663a;
     }
     .upload-area small { font-size: .75rem; color: #a0aec0; }
     .btn-massa {
-      padding: 8px 20px; background: #1a5276; color: #fff;
+      padding: 8px 20px; background: #15663a; color: #fff;
       border: none; border-radius: 5px; font-size: .85rem;
       font-weight: 700; cursor: pointer; transition: background .15s;
     }
-    .btn-massa:hover:not(:disabled) { background: #154360; }
+    .btn-massa:hover:not(:disabled) { background: #0f4d2b; }
     .btn-massa:disabled { opacity: .6; cursor: not-allowed; }
     .massa-table-wrap {
       overflow-x: auto; border-radius: 6px; border: 1px solid #e8ecf0;
@@ -470,7 +483,7 @@
       padding: 2px 4px; font-size: .8rem; background: transparent;
       width: 100%; box-sizing: border-box; font-family: inherit; color: #2d3748;
     }
-    .massa-input:focus { outline: none; border-bottom: 2px solid #2980b9; background: #eef5fb; }
+    .massa-input:focus { outline: none; border-bottom: 2px solid #4ca23f; background: #eaf6ee; }
     .massa-input::placeholder { color: #b0bec5; }
     .cell-warn input { border-bottom-color: #e74c3c; }
     .cell-warn input::placeholder { color: #e74c3c; }
@@ -479,7 +492,7 @@
       margin-top: 14px; overflow: hidden;
     }
     .massa-progress-fill {
-      height: 100%; background: linear-gradient(90deg,#1a5276,#2980b9);
+      height: 100%; background: linear-gradient(90deg,#15663a,#4ca23f);
       width: 0%; transition: width .25s; border-radius: 5px;
     }
     .status-wait { color: #a0aec0; font-size: .77rem; }
@@ -492,9 +505,12 @@
 <body>
 
 <header>
-  <div>
-    <h1>E-MTR — Manifesto de Transporte de Resíduos</h1>
-    <p>Sistema Eletrônico de Gerenciamento de Resíduos</p>
+  <div class="brand">
+    <img src="logo-uniao.png" alt="União Recicláveis" class="brand-logo">
+    <div>
+      <h1>E-MTR — Manifesto de Transporte de Resíduos</h1>
+      <p>Sistema Eletrônico de Gerenciamento de Resíduos</p>
+    </div>
   </div>
   <div class="header-actions">
     <div class="sistema-wrap">
@@ -508,7 +524,7 @@
 <!-- ===== Modal Configurações ===== -->
 <div id="modal-config" class="modal-overlay" style="display:none" onclick="if(event.target===this)fecharConfig()">
   <div class="modal-box" style="max-width:420px">
-    <h3 id="cfg-titulo" style="margin:0 0 20px;color:#1a5276;font-size:1.05rem">Acesso</h3>
+    <h3 id="cfg-titulo" style="margin:0 0 20px;color:#15663a;font-size:1.05rem">Acesso</h3>
     <p style="font-size:.82rem;color:#718096;margin:-12px 0 18px">
       Cada acesso é um login. Você pode ter vários (ex.: FEAM Leopoldina, FEAM Bituruna). Salvos no navegador.
     </p>
@@ -977,6 +993,10 @@
 </div>
 
 </div><!-- /.container -->
+
+<footer class="site-footer">
+  powered by <strong>vieir.ia</strong>
+</footer>
 
 <script>
   // ── Webhooks por dialeto de API ──────────────────────────────────────────────
