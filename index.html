@@ -1994,18 +1994,18 @@
   }
 
   async function renderResults(data) {
-    // Mostra só MTRs em que somos o DESTINADOR (pra dar baixa).
-    // Se transportador E destinador forem nós (transporte próprio), MANTÉM.
+    // Mostra só MTRs em que somos o DESTINADOR (pra dar baixa) — inclui transporte próprio
+    // (transportador = destinador = nós). Só dá pra filtrar com segurança quando a consulta
+    // manda o CNPJ do destinador; sem ele, NÃO esconde nada (evita sumir transporte próprio).
     const meuCnpj = (_cred().pessoaCnpj || _cred().cpfCnpj || '').replace(/\D/g, '');
     let manifests = data.manifests || [];
     let ocultados = 0;
     if (meuCnpj) {
       const antes = manifests.length;
       manifests = manifests.filter(m => {
-        const dest   = String(m.cnpDestinador   || '').replace(/\D/g, '');
-        const transp = String(m.cnpTransportador || '').replace(/\D/g, '');
-        if (dest)  return dest === meuCnpj;     // sabemos o destinador → só os nossos (inclui transporte próprio)
-        return transp !== meuCnpj;              // sem destinador (workflow antigo) → esconde só onde somos transportador
+        const dest = String(m.cnpDestinador || '').replace(/\D/g, '');
+        if (!dest) return true;          // consulta não trouxe destinador → mantém tudo
+        return dest === meuCnpj;          // mantém só onde somos o destinador (inclui transporte próprio)
       });
       ocultados = antes - manifests.length;
     }
