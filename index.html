@@ -1964,7 +1964,16 @@
   }
 
   async function renderResults(data) {
-    const manifests = data.manifests || [];
+    // Mostra só MTRs em que somos o DESTINADOR (pra dar baixa). Oculta onde
+    // o nosso CNPJ ativo é o TRANSPORTADOR — não é caso de recebimento.
+    const meuCnpj = (_cred().pessoaCnpj || _cred().cpfCnpj || '').replace(/\D/g, '');
+    let manifests = data.manifests || [];
+    let ocultados = 0;
+    if (meuCnpj) {
+      const antes = manifests.length;
+      manifests = manifests.filter(m => String(m.cnpTransportador || '').replace(/\D/g, '') !== meuCnpj);
+      ocultados = antes - manifests.length;
+    }
     _ultimoResultado = manifests;
     const wrap = document.getElementById('consulta-results');
     const tbody = document.getElementById('results-tbody');
@@ -1972,12 +1981,15 @@
 
     if (!manifests.length) {
       wrap.style.display = 'none';
-      showResponse('resp-consulta', '⚠ Nenhum MTR encontrado no período informado.', false);
+      showResponse('resp-consulta',
+        ocultados ? `⚠ Nenhum MTR pra dar baixa — os ${ocultados} encontrado(s) são de transporte (você é transportador).`
+                  : '⚠ Nenhum MTR encontrado no período informado.', false);
       return;
     }
 
+    const sufixo = ocultados ? ` (${ocultados} de transporte ocultado${ocultados > 1 ? 's' : ''})` : '';
     // Exibe tabela vazia imediatamente enquanto busca nomes
-    count.textContent = `${manifests.length} MTR(s) encontrado(s) — buscando nomes…`;
+    count.textContent = `${manifests.length} MTR(s)${sufixo} — buscando nomes…`;
     wrap.style.display = 'block';
     document.getElementById('resp-consulta').className = 'response-box';
 
@@ -1994,7 +2006,7 @@
       if (i + 4 < cnpjs.length) await new Promise(r => setTimeout(r, 600));
     }
 
-    count.textContent = `${manifests.length} MTR(s) encontrado(s)`;
+    count.textContent = `${manifests.length} MTR(s) encontrado(s)${sufixo}`;
     tbody.innerHTML = manifests.map(m => {
       const codigo     = m.manifestoCodigo ?? m.codigo ?? '—';
       const dataEmis   = formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao);
