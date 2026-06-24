@@ -510,8 +510,21 @@
   <div class="modal-box" style="max-width:420px">
     <h3 id="cfg-titulo" style="margin:0 0 20px;color:#1a5276;font-size:1.05rem">Acesso</h3>
     <p style="font-size:.82rem;color:#718096;margin:-12px 0 18px">
-      Credenciais de cada sistema, salvas localmente no navegador. Cada sistema tem o seu acesso.
+      Cada acesso é um login. Você pode ter vários (ex.: FEAM Leopoldina, FEAM Bituruna). Salvos no navegador.
     </p>
+    <div class="field">
+      <label>Nome do acesso</label>
+      <input type="text" id="cfg-nome" placeholder="Ex.: FEAM Leopoldina">
+    </div>
+    <div class="field">
+      <label>Tipo de sistema</label>
+      <select id="cfg-tipo" onchange="_cfgTipoChange()"
+              style="width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cbd5e0;border-radius:8px;font-size:.9rem;background:#fff">
+        <option value="feam">FEAM-MG (API antiga)</option>
+        <option value="sinir">SINIR (API nova)</option>
+        <option value="inea">INEA-RJ (API nova)</option>
+      </select>
+    </div>
     <!-- Campos FEAM-MG (API antiga /api) -->
     <div class="dialect-feam">
       <div class="field">
@@ -549,9 +562,13 @@
       <label>URL da API <span style="font-weight:400;color:#a0aec0">(padrão do sistema)</span></label>
       <input type="text" id="cfg-apiBase" placeholder="https://.../api">
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
-      <button class="btn-modal-cancel" onclick="fecharConfig()">Cancelar</button>
-      <button class="btn-modal-baixa" onclick="salvarConfig()">Salvar</button>
+    <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:20px">
+      <button class="btn-modal-cancel" id="cfg-excluir" onclick="excluirPerfil()"
+              style="color:#c0392b;border-color:#e8b4ae">Excluir</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-modal-cancel" onclick="fecharConfig()">Cancelar</button>
+        <button class="btn-modal-baixa" onclick="salvarConfig()">Salvar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -978,53 +995,71 @@
     },
   };
 
-  // ── Sistemas MTR (FEAM-MG, INEA-RJ, SINIR-Federal) ───────────────────────────
-  // dialect: qual API o sistema fala. URL confirmada por teste ao vivo (jun/2026).
-  const SISTEMAS = {
+  // ── Perfis de acesso (vários logins; cada um com seu sistema/credenciais) ─────
+  // Tipos-base: dialect = qual API fala; url = padrão (confirmada por teste, jun/2026).
+  const BASE = {
     feam:  { nome: 'FEAM-MG',         dialect: 'feam',  url: 'https://mtr.meioambiente.mg.gov.br/api' },
-    inea:  { nome: 'INEA-RJ',         dialect: 'sinir', url: 'https://mtr.inea.rj.gov.br/apiws/rest' },
     sinir: { nome: 'SINIR (Federal)', dialect: 'sinir', url: 'https://admin.sinir.gov.br/apiws/rest' },
+    inea:  { nome: 'INEA-RJ',         dialect: 'sinir', url: 'https://mtr.inea.rj.gov.br/apiws/rest' },
   };
 
-  function sistemaAtivo() { return localStorage.getItem('mtr_sistema') || 'feam'; }
-  function dialetoAtivo() { return SISTEMAS[sistemaAtivo()]?.dialect || 'feam'; }
-  function _credKey(sis)  { return 'mtr_auth_' + sis; }
-  function _cred()        { return JSON.parse(localStorage.getItem(_credKey(sistemaAtivo())) || '{}'); }
-
-  function webhookURL(feature) {
-    return WEBHOOK_BASE + (WEBHOOKS[dialetoAtivo()]?.[feature] || '');
+  function getPerfis() {
+    let p = [];
+    try { p = JSON.parse(localStorage.getItem('mtr_perfis') || '[]'); } catch (e) {}
+    if (!Array.isArray(p) || !p.length) {
+      // Migração: cria os 3 perfis padrão com ids iguais aos antigos (mantém credenciais já salvas)
+      p = Object.entries(BASE).map(([id, b]) => ({ id, nome: b.nome, base: id, dialect: b.dialect, url: b.url }));
+      localStorage.setItem('mtr_perfis', JSON.stringify(p));
+    }
+    return p;
   }
+  function savePerfis(p) { localStorage.setItem('mtr_perfis', JSON.stringify(p)); }
 
-  // Campos obrigatórios do gettoken, por dialeto
+  function sistemaAtivo() {
+    const id = localStorage.getItem('mtr_sistema');
+    const perfis = getPerfis();
+    return (id && perfis.some(p => p.id === id)) ? id : perfis[0].id;
+  }
+  function perfilAtivo() {
+    const perfis = getPerfis();
+    return perfis.find(p => p.id === sistemaAtivo()) || perfis[0];
+  }
+  function dialetoAtivo() { return perfilAtivo().dialect || 'feam'; }
+  function _cred()        { return JSON.parse(localStorage.getItem('mtr_auth_' + sistemaAtivo()) || '{}'); }
+
+  function webhookURL(feature) { return WEBHOOK_BASE + (WEBHOOKS[dialetoAtivo()]?.[feature] || ''); }
+
   function _camposObrigatorios() {
     return dialetoAtivo() === 'sinir'
       ? ['cpfCnpj', 'unidade', 'senha']
       : ['pessoaCodigo', 'pessoaCnpj', 'usuarioCpf', 'senha'];
   }
 
-  // Payload enviado aos webhooks: auth (campos do gettoken conforme dialeto) + apiBase
   function getAuthPayload() {
-    const sis = sistemaAtivo();
-    const c   = _cred();
+    const c = _cred();
     const auth = dialetoAtivo() === 'sinir'
       ? { cpfCnpj: c.cpfCnpj, senha: c.senha, unidade: c.unidade }
       : { pessoaCodigo: c.pessoaCodigo, pessoaCnpj: c.pessoaCnpj, usuarioCpf: c.usuarioCpf, senha: c.senha };
-    return { auth, apiBase: c.apiBase || SISTEMAS[sis]?.url || '', dialect: dialetoAtivo() };
+    return { auth, apiBase: c.apiBase || perfilAtivo().url || '', dialect: dialetoAtivo() };
+  }
+
+  function _popularSelector() {
+    const sel = document.getElementById('sistema-sel');
+    if (!sel) return;
+    sel.innerHTML = getPerfis().map(p => `<option value="${p.id}">${p.nome}</option>`).join('')
+      + '<option value="__novo__">➕ Adicionar acesso…</option>';
+    sel.value = sistemaAtivo();
   }
 
   function _initSistema() {
-    const sel = document.getElementById('sistema-sel');
-    if (sel) {
-      sel.innerHTML = Object.entries(SISTEMAS)
-        .map(([k, v]) => `<option value="${k}">${v.nome}</option>`).join('');
-      sel.value = sistemaAtivo();
-    }
+    _popularSelector();
     _atualizaBtnConfig();
     _atualizaConsultaInputs();
   }
 
-  function trocarSistema(sis) {
-    localStorage.setItem('mtr_sistema', sis);
+  function trocarSistema(val) {
+    if (val === '__novo__') { novoPerfil(); return; }
+    localStorage.setItem('mtr_sistema', val);
     _atualizaBtnConfig();
     _atualizaConsultaInputs();
   }
@@ -1045,33 +1080,65 @@
     btn.textContent = ok ? '⚙ Configurações' : '⚠ Configurar Acesso';
   }
 
-  function abrirConfig() {
-    const sis = sistemaAtivo();
-    const c   = _cred();
-    const dial = dialetoAtivo();
-    document.getElementById('cfg-titulo').textContent = 'Acesso: ' + SISTEMAS[sis].nome;
-    // mostra só os campos do dialeto ativo
+  // Ajusta campos visíveis e URL padrão conforme o "Tipo de sistema" escolhido no modal
+  function _cfgTipoChange() {
+    const tipo = document.getElementById('cfg-tipo').value;   // feam | sinir | inea
+    const dial = BASE[tipo].dialect;
     document.querySelectorAll('.dialect-feam').forEach(el => el.style.display  = dial === 'feam'  ? '' : 'none');
     document.querySelectorAll('.dialect-sinir').forEach(el => el.style.display = dial === 'sinir' ? '' : 'none');
+    const urlEl = document.getElementById('cfg-apiBase');
+    const padroes = Object.values(BASE).map(b => b.url);
+    if (!urlEl.value.trim() || padroes.includes(urlEl.value.trim())) urlEl.value = BASE[tipo].url;
+  }
+
+  let _cfgNovo = false;
+
+  function novoPerfil() {
+    _cfgNovo = true;
+    document.getElementById('cfg-titulo').textContent = 'Novo acesso';
+    document.getElementById('cfg-nome').value = '';
+    document.getElementById('cfg-tipo').value = 'feam';
+    ['pessoaCodigo','pessoaCnpj','usuarioCpf','cpfCnpj','unidade','senha'].forEach(f =>
+      document.getElementById('cfg-' + f).value = '');
+    document.getElementById('cfg-apiBase').value = BASE.feam.url;
+    document.getElementById('cfg-excluir').style.display = 'none';
+    _cfgTipoChange();
+    document.getElementById('modal-config').style.display = 'flex';
+  }
+
+  function abrirConfig() {
+    _cfgNovo = false;
+    const p = perfilAtivo();
+    const c = _cred();
+    document.getElementById('cfg-titulo').textContent = 'Acesso: ' + p.nome;
+    document.getElementById('cfg-nome').value = p.nome;
+    document.getElementById('cfg-tipo').value = p.base || (p.dialect === 'sinir' ? 'sinir' : 'feam');
     document.getElementById('cfg-pessoaCodigo').value = c.pessoaCodigo || '';
     document.getElementById('cfg-pessoaCnpj').value   = c.pessoaCnpj   || '';
     document.getElementById('cfg-usuarioCpf').value   = c.usuarioCpf   || '';
     document.getElementById('cfg-cpfCnpj').value      = c.cpfCnpj      || '';
     document.getElementById('cfg-unidade').value      = c.unidade      || '';
     document.getElementById('cfg-senha').value        = c.senha        || '';
-    document.getElementById('cfg-apiBase').value      = c.apiBase || SISTEMAS[sis].url || '';
+    document.getElementById('cfg-apiBase').value      = c.apiBase || p.url || '';
+    document.getElementById('cfg-excluir').style.display = getPerfis().length > 1 ? '' : 'none';
+    _cfgTipoChange();
     document.getElementById('modal-config').style.display = 'flex';
   }
 
   function fecharConfig() {
     document.getElementById('modal-config').style.display = 'none';
+    _cfgNovo = false;
+    _popularSelector();   // reverte o seletor caso tenha clicado em "➕ Adicionar" e cancelado
   }
 
   function salvarConfig() {
-    const sis     = sistemaAtivo();
-    const dial    = dialetoAtivo();
+    const tipo    = document.getElementById('cfg-tipo').value;   // feam | sinir | inea
+    const dial    = BASE[tipo].dialect;
+    const nome    = document.getElementById('cfg-nome').value.trim();
     const senha   = document.getElementById('cfg-senha').value.trim();
     const apiBase = document.getElementById('cfg-apiBase').value.trim().replace(/\/+$/, '');
+    if (!nome)    { alert('Dê um nome ao acesso (ex.: FEAM Leopoldina).'); return; }
+    if (!apiBase) { alert('Informe a URL da API.'); return; }
     let cred;
     if (dial === 'sinir') {
       const cpfCnpj = document.getElementById('cfg-cpfCnpj').value.replace(/\D/g, '');
@@ -1079,16 +1146,46 @@
       if (!cpfCnpj || !unidade || !senha) { alert('Preencha CPF/CNPJ, Unidade e Senha.'); return; }
       cred = { cpfCnpj, unidade, senha, apiBase };
     } else {
-      const cod = parseInt(document.getElementById('cfg-pessoaCodigo').value);
+      const cod  = parseInt(document.getElementById('cfg-pessoaCodigo').value);
       const cnpj = document.getElementById('cfg-pessoaCnpj').value.replace(/\D/g, '');
       const cpf  = document.getElementById('cfg-usuarioCpf').value.replace(/\D/g, '');
       if (!cod || !cnpj || !cpf || !senha) { alert('Preencha todos os campos de acesso.'); return; }
       cred = { pessoaCodigo: cod, pessoaCnpj: cnpj, usuarioCpf: cpf, senha, apiBase };
     }
-    if (!apiBase) { alert('Informe a URL da API.'); return; }
-    localStorage.setItem(_credKey(sis), JSON.stringify(cred));
-    fecharConfig();
+
+    const perfis = getPerfis();
+    let id;
+    if (_cfgNovo) {
+      id = tipo + '_' + Date.now();
+      perfis.push({ id, nome, base: tipo, dialect: dial, url: apiBase });
+    } else {
+      const p = perfis.find(x => x.id === sistemaAtivo());
+      id = p.id;
+      p.nome = nome; p.base = tipo; p.dialect = dial; p.url = apiBase;
+    }
+    savePerfis(perfis);
+    localStorage.setItem('mtr_auth_' + id, JSON.stringify(cred));
+    localStorage.setItem('mtr_sistema', id);
+    _cfgNovo = false;
+    document.getElementById('modal-config').style.display = 'none';
+    _popularSelector();
     _atualizaBtnConfig();
+    _atualizaConsultaInputs();
+  }
+
+  function excluirPerfil() {
+    const perfis = getPerfis();
+    if (perfis.length <= 1) { alert('É preciso ter ao menos um acesso.'); return; }
+    const p = perfilAtivo();
+    if (!confirm(`Excluir o acesso "${p.nome}"? As credenciais salvas dele serão apagadas.`)) return;
+    const novos = perfis.filter(x => x.id !== p.id);
+    savePerfis(novos);
+    localStorage.removeItem('mtr_auth_' + p.id);
+    localStorage.setItem('mtr_sistema', novos[0].id);
+    document.getElementById('modal-config').style.display = 'none';
+    _popularSelector();
+    _atualizaBtnConfig();
+    _atualizaConsultaInputs();
   }
 
   window.addEventListener('DOMContentLoaded', _initSistema);
@@ -1993,7 +2090,7 @@
 
   async function submitConsulta() {
     if (!_camposObrigatorios().every(k => _cred()[k])) {
-      showResponse('resp-consulta', `❌ Configure o acesso de ${SISTEMAS[sistemaAtivo()].nome} em ⚙ Configurações antes de consultar.`, true); return;
+      showResponse('resp-consulta', `❌ Configure o acesso de ${perfilAtivo().nome} em ⚙ Configurações antes de consultar.`, true); return;
     }
 
     // Monta o corpo conforme o dialeto: FEAM = período, SINIR/INEA = lista de números
