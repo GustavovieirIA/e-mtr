@@ -1964,14 +1964,19 @@
   }
 
   async function renderResults(data) {
-    // Mostra só MTRs em que somos o DESTINADOR (pra dar baixa). Oculta onde
-    // o nosso CNPJ ativo é o TRANSPORTADOR — não é caso de recebimento.
+    // Mostra só MTRs em que somos o DESTINADOR (pra dar baixa).
+    // Se transportador E destinador forem nós (transporte próprio), MANTÉM.
     const meuCnpj = (_cred().pessoaCnpj || _cred().cpfCnpj || '').replace(/\D/g, '');
     let manifests = data.manifests || [];
     let ocultados = 0;
     if (meuCnpj) {
       const antes = manifests.length;
-      manifests = manifests.filter(m => String(m.cnpTransportador || '').replace(/\D/g, '') !== meuCnpj);
+      manifests = manifests.filter(m => {
+        const dest   = String(m.cnpDestinador   || '').replace(/\D/g, '');
+        const transp = String(m.cnpTransportador || '').replace(/\D/g, '');
+        if (dest)  return dest === meuCnpj;     // sabemos o destinador → só os nossos (inclui transporte próprio)
+        return transp !== meuCnpj;              // sem destinador (workflow antigo) → esconde só onde somos transportador
+      });
       ocultados = antes - manifests.length;
     }
     _ultimoResultado = manifests;
