@@ -1017,6 +1017,7 @@
     emitir:   '/api/emitir',
     baixa:    '/api/baixa',
     consulta: '/api/consulta',
+    nomes:    '/api/nomes',
   };
 
   // ── Perfis de acesso (vários logins; cada um com seu sistema/credenciais) ─────
@@ -1915,27 +1916,37 @@
   let _ultimoResultado = [];
   let _nomeMap = {};
 
-  async function fetchNomeCNPJ(cnpj) {
-    if (!cnpj || cnpj === '—') return '';
-    const digits = String(cnpj).replace(/\D/g, '');
-    if (digits.length !== 14) return (_nomeMap[cnpj] = '');  // CPF ou código inválido
-    if (_nomeMap[cnpj] !== undefined) return _nomeMap[cnpj];
-    const _try = async () => {
-      const r = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + digits);
-      if (r.status === 429) return null;  // rate limit — vai retentar
-      if (!r.ok) return '';               // 404 ou outro erro — sem nome
-      const d = await r.json();
-      return d.razao_social || '';
-    };
+  // Nomes de empresa por CNPJ. Quem busca é /api/nomes — a BrasilAPI bloqueia o
+  // IP por minutos se levar uma rajada, então nada de chamá-la direto daqui.
+  // Razão social não muda, então o que já foi resolvido fica guardado no
+  // navegador para sempre: na prática só se busca CNPJ visto pela primeira vez.
+  function _carregaNomes() {
+    try { _nomeMap = JSON.parse(localStorage.getItem('mtr_nomes') || '{}'); }
+    catch { _nomeMap = {}; }
+  }
+  function _guardaNomes() {
+    try { localStorage.setItem('mtr_nomes', JSON.stringify(_nomeMap)); } catch {}
+  }
+
+  // Devolve só os nomes recém-descobertos, para a tabela ser atualizada.
+  // Nunca guarda vazio: assim um CNPJ que ficou pendente é tentado de novo depois.
+  async function resolverNomes(cnpjs) {
+    const faltando = [...new Set(cnpjs.map(c => String(c || '').replace(/\D/g, '')))]
+      .filter(c => c.length === 14 && !_nomeMap[c]);
+    if (!faltando.length) return {};
     try {
-      let nome = await _try();
-      if (nome === null) {                // rate limit: aguarda e retenta
-        await new Promise(r => setTimeout(r, 1500));
-        nome = await _try() ?? '';
-      }
-      return (_nomeMap[cnpj] = nome || '');
+      const res = await fetch(apiURL('nomes'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cnpjs: faltando }),
+      });
+      if (!res.ok) return {};
+      const { nomes = {} } = await res.json();
+      Object.entries(nomes).forEach(([cnpj, nome]) => { if (nome) _nomeMap[cnpj] = nome; });
+      _guardaNomes();
+      return nomes;
     } catch {
-      return (_nomeMap[cnpj] = '');
+      return {};
     }
   }
 
@@ -2017,23 +2028,15 @@
     }
 
     const sufixo = ocultados ? ` (${ocultados} de transporte ocultado${ocultados > 1 ? 's' : ''})` : '';
-    // Exibe tabela vazia imediatamente enquanto busca nomes
-    count.textContent = `${manifests.length} MTR(s)${sufixo} — buscando nomes…`;
     wrap.style.display = 'block';
     document.getElementById('resp-consulta').className = 'response-box';
 
-    // SINIR já manda os nomes (parDescricao) — semeia o cache pra não rebuscar.
+    // SINIR já manda os nomes (parDescricao) — aproveita e guarda, são de graça.
     manifests.forEach(m => {
       if (m.nomeGerador && m.cnpGerador)             _nomeMap[m.cnpGerador]      = m.nomeGerador;
       if (m.nomeTransportador && m.cnpTransportador) _nomeMap[m.cnpTransportador] = m.nomeTransportador;
     });
-    // BrasilAPI só para CNPJs ainda sem nome (caso do FEAM)
-    const cnpjs = [...new Set(manifests.flatMap(m => [m.cnpGerador, m.cnpTransportador].filter(Boolean)))]
-      .filter(c => !_nomeMap[c]);
-    for (let i = 0; i < cnpjs.length; i += 4) {
-      await Promise.all(cnpjs.slice(i, i + 4).map(fetchNomeCNPJ));
-      if (i + 4 < cnpjs.length) await new Promise(r => setTimeout(r, 600));
-    }
+    _guardaNomes();
 
     count.textContent = `${manifests.length} MTR(s) encontrado(s)${sufixo}`;
     tbody.innerHTML = manifests.map(m => {
@@ -2050,16 +2053,32 @@
         <td>${dataEmis}</td>
         <td>
           <span style="font-size:.72rem;color:#718096;font-family:monospace">${cnpjGer}</span><br>
-          <strong style="font-size:.82rem">${nomeGer}</strong>
+          <strong style="font-size:.82rem" data-cnpj="${cnpjGer}">${nomeGer}</strong>
         </td>
         <td>
           <span style="font-size:.72rem;color:#718096;font-family:monospace">${cnpjTransp}</span><br>
-          <strong style="font-size:.82rem">${nomeTransp}</strong>
+          <strong style="font-size:.82rem" data-cnpj="${cnpjTransp}">${nomeTransp}</strong>
         </td>
         <td>${situacao}</td>
         <td><button class="btn-baixa-row" onclick='openBaixaModal(${mStr})'>Dar Baixa</button></td>
       </tr>`;
     }).join('');
+
+    // Os nomes que faltam entram na tabela quando chegarem — sem segurar a tela.
+    const semNome = manifests
+      .flatMap(m => [m.cnpGerador, m.cnpTransportador])
+      .filter(c => c && !_nomeMap[c]);
+    if (semNome.length) {
+      count.textContent = `${manifests.length} MTR(s) encontrado(s)${sufixo} — buscando nomes…`;
+      const nomes = await resolverNomes(semNome);
+      Object.entries(nomes).forEach(([cnpj, nome]) => {
+        if (!nome) return;
+        tbody.querySelectorAll(`[data-cnpj="${cnpj}"]`).forEach(el => { el.textContent = nome; });
+      });
+      const faltam = new Set(semNome.filter(c => !_nomeMap[c])).size;
+      count.textContent = `${manifests.length} MTR(s) encontrado(s)${sufixo}`
+        + (faltam ? ` — ${faltam} nome(s) não resolvido(s), tente de novo em alguns minutos` : '');
+    }
   }
 
   function exportarCSV() {
@@ -2273,6 +2292,7 @@
 
   initSelects();
   checkLastMTR();
+  _carregaNomes();
   initCombo("e-codResiduoIbama-search","e-codResiduoIbama","e-codResiduoIbama-dd","e-codResiduoIbama-sel");
   initCombo("b-codResiduoIbama-search","b-codResiduoIbama","b-codResiduoIbama-dd","b-codResiduoIbama-sel");
 </script>
