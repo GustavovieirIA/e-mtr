@@ -604,6 +604,7 @@
     <button class="tab-btn active" onclick="switchTab('emitir', this)">Emitir MTR</button>
     <button class="tab-btn"        onclick="switchTab('baixa', this)">Dar Baixa no MTR</button>
     <button class="tab-btn"        onclick="switchTab('consulta', this)">Consultar MTRs</button>
+    <button class="tab-btn"        onclick="switchTab('conc', this)">Conciliação Balança</button>
   </div>
 
   <div class="card">
@@ -945,6 +946,109 @@
 
     </div>
 
+    <!-- ===== TAB 4: Conciliação Balança ===== -->
+    <div id="panel-conc" class="tab-panel">
+
+      <p class="section-title">1. Arquivo da balança</p>
+      <label class="upload-area" for="conc-file-input"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="event.preventDefault();this.classList.remove('drag-over');
+                     document.getElementById('conc-file-input').files=event.dataTransfer.files;
+                     concUpload({target:document.getElementById('conc-file-input')})">
+        <span id="conc-upload-label">📂 Clique ou arraste o(s) relatório(s) de pesagens (.xlsx)</span>
+        <small>Colunas esperadas: Nº Pesagem, Placa, Gerador, Data/hora de entrada, Peso Total Líquido (Kg), Aterro — pode selecionar mais de um arquivo</small>
+        <input type="file" id="conc-file-input" accept=".xlsx" multiple style="display:none" onchange="concUpload(event)" />
+      </label>
+      <div id="conc-file-info" style="display:none;font-size:.84rem;color:#4a5568;margin:10px 0 0"></div>
+
+      <p class="section-title" style="margin-top:26px">2. Logins e MTRs</p>
+      <div class="grid">
+        <div class="field">
+          <label>Login FEAM — Leopoldina</label>
+          <select id="conc-login-leopoldina" onchange="concSalvarLogins()"></select>
+        </div>
+        <div class="field">
+          <label>Login FEAM — Bituruna</label>
+          <select id="conc-login-bituruna" onchange="concSalvarLogins()"></select>
+        </div>
+        <div class="field">
+          <label>Login SINIR</label>
+          <select id="conc-login-sinir" onchange="concSalvarLogins()"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Números de MTR do SINIR <span class="opt">um por linha — o SINIR não lista por período; copie do portal</span></label>
+        <textarea id="conc-numeros-sinir" rows="4" placeholder="331032128975&#10;331032128972&#10;…"
+          style="font-family:monospace;font-size:.85rem"></textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
+        <button class="btn-search" id="btn-conc-buscar" onclick="concBuscar()">Buscar MTRs e conciliar</button>
+        <button class="btn-modal-cancel" onclick="concAbrirCadastro()">⚙ Cadastro de geradores</button>
+      </div>
+      <div class="response-box" id="resp-conc"></div>
+
+      <!-- Resultados -->
+      <div id="conc-resultados" style="display:none">
+
+        <p class="section-title" style="margin-top:28px">3. Conferência</p>
+        <div id="conc-resumo" style="font-size:.86rem;color:#4a5568;margin:0 0 14px"></div>
+
+        <div id="conc-sec-propostas" style="display:none">
+          <p style="font-weight:700;font-size:.9rem;color:#15663a;margin:18px 0 8px">✔ Propostas de baixa</p>
+          <p style="font-size:.8rem;color:#718096;margin:0 0 8px">
+            Verde = soma fecha com a balança (≤10%) · Amarelo = 10–30% · Vermelho = diverge &gt;30% (desmarcado — confira antes).
+            O peso da balança é rateado entre os MTRs do grupo proporcionalmente à quantidade indicada.
+          </p>
+          <div class="massa-table-wrap">
+            <table class="results-table">
+              <thead><tr>
+                <th></th><th>Pesagem</th><th>Data</th><th>Gerador (balança)</th>
+                <th>Balança (t)</th><th>MTR(s)</th><th>Indicado (t)</th><th>Dif.</th><th>Status</th>
+              </tr></thead>
+              <tbody id="conc-tbody-propostas"></tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:14px">
+            <button class="btn-massa" id="btn-conc-processar" onclick="concProcessar()">▶ Dar baixa nas selecionadas</button>
+            <span id="conc-proc-label" style="font-size:.82rem;color:#4a5568"></span>
+          </div>
+        </div>
+
+        <div id="conc-sec-sempar" style="display:none">
+          <p style="font-weight:700;font-size:.9rem;color:#b45309;margin:24px 0 8px">⚠ Pesagens sem MTR correspondente</p>
+          <div class="massa-table-wrap">
+            <table class="results-table">
+              <thead><tr><th>Pesagem</th><th>Data</th><th>Gerador (balança)</th><th>Balança (t)</th><th>Motivo</th></tr></thead>
+              <tbody id="conc-tbody-sempar"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="conc-sec-sobra" style="display:none">
+          <p style="font-weight:700;font-size:.9rem;color:#b45309;margin:24px 0 8px">⚠ MTRs pendentes sem pesagem</p>
+          <div class="massa-table-wrap">
+            <table class="results-table">
+              <thead><tr><th>Nº MTR</th><th>Emissão</th><th>Gerador</th><th>Transportador</th><th>Indicado (t)</th><th>Sistema</th></tr></thead>
+              <tbody id="conc-tbody-sobra"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="conc-sec-armaz" style="display:none">
+          <p style="font-weight:700;font-size:.9rem;color:#718096;margin:24px 0 8px">ℹ Em Armazenamento Temporário (não recebem baixa)</p>
+          <div class="massa-table-wrap">
+            <table class="results-table">
+              <thead><tr><th>Nº MTR</th><th>Emissão</th><th>Gerador</th><th>Situação</th></tr></thead>
+              <tbody id="conc-tbody-armaz"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div><!-- /.card -->
 
 <!-- ===== Modal Dar Baixa ===== -->
@@ -998,6 +1102,34 @@
       <button class="btn-modal-baixa" id="btn-confirmar-baixa" onclick="confirmarBaixaModal()">
         Confirmar Baixa
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal Cadastro de Geradores (conciliação) ===== -->
+<div class="modal-overlay" id="modal-cadastro" onclick="if(event.target===this)concFecharCadastro()">
+  <div class="modal-box" style="max-width:980px">
+    <p class="modal-title">Cadastro de geradores — balança × MTR</p>
+    <p style="font-size:.82rem;color:#718096;margin:0 0 14px">
+      Liga o nome que a balança escreve ao CNPJ que aparece no MTR.
+      <strong>Papel</strong>: onde esse CNPJ aparece no MTR (gerador ou transportador).
+      <strong>Padrão</strong>: Direto = 1 MTR por viagem · Consolidador = 1 viagem junta vários MTRs (soma tem que fechar) ·
+      Lote = MTRs emitidos em bloco, casamento por ordem cronológica. Salvo neste navegador.
+    </p>
+    <div class="massa-table-wrap" style="max-height:420px">
+      <table class="results-table" id="cad-table">
+        <thead><tr>
+          <th>Nome na balança</th><th>CNPJ no MTR</th><th>Papel</th><th>Padrão</th><th>Sistema</th><th></th>
+        </tr></thead>
+        <tbody id="cad-tbody"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px">
+      <button class="btn-modal-cancel" onclick="concAddCadastro()">➕ Adicionar linha</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-modal-cancel" onclick="concFecharCadastro()">Cancelar</button>
+        <button class="btn-modal-baixa" onclick="concSalvarCadastro()">Salvar cadastro</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2318,9 +2450,526 @@
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
+  // ── Conciliação Balança ──────────────────────────────────────────────────────
+  // Cruza o relatório de pesagens da balança com os MTRs pendentes dos sistemas.
+  // Três padrões de casamento, definidos no cadastro de cada gerador:
+  //   direto       → 1 MTR por viagem, emitido no dia da pesagem ou na véspera
+  //   consolidador → 1 viagem junta vários MTRs (dia/véspera); a soma tem que fechar
+  //   lote         → MTRs emitidos em bloco (prefeituras); casamento por ordem
+  //                  cronológica, juntando MTRs até a soma aproximar do peso
+  // Nada é enviado sem conferência: cada proposta mostra a evidência e só as
+  // marcadas são processadas.
+
+  const CONC_TOL_VERDE   = 0.10;   // soma fecha
+  const CONC_TOL_AMARELA = 0.30;   // olhar antes de aprovar
+  const CONC_SEED = [
+    ['CIMVALPI - SAO PEDRO DOS FERROS','19243500000182','gerador','lote','bituruna'],
+    ['CIMVALPI - SANTA CRUZ ESCALVADO','18316273000105','gerador','lote','bituruna'],
+    ['CIACARNE','07946019000174','gerador','direto','bituruna'],
+    ['LATICINIOS LEOLAC','47725835000172','gerador','direto','leopoldina'],
+    ['TANGARA FOODS','39787056002117','gerador','direto','bituruna'],
+    ['RIO BRANCO ALIMENTOS VDR','05017780000287','gerador','direto','leopoldina'],
+    ['RIO BRANCO ALIMENTOS LEOPOLDINA','05017780002301','gerador','direto','leopoldina'],
+    ['BRITVIC','07604556002694','gerador','direto','leopoldina'],
+    ['LATICINIOS PORTO ALEGRE','66301334000103','gerador','direto','bituruna'],
+    ['LATICINIOS PORTO ALEGRE (LEITE)','66301334000537','gerador','direto','leopoldina'],
+    ['ANGLO AMERICAN','02359572000510','gerador','direto','bituruna'],
+    ['FRIRED - MIRACEMA','11437997000168','gerador','direto','leopoldina'],
+    ['FRIRED INDUSTRIA DE ALIMENTOS','11437997000168','gerador','direto','leopoldina'],
+    ['PONTE NOVA PAPEIS','02625899000244','gerador','direto','leopoldina'],
+    ['V MENEZES ME','07596305000157','transportador','consolidador','leopoldina'],
+    ['OUROSERV','14524823000120','transportador','consolidador','bituruna'],
+    ['ITATIAIA MOVEIS','25331521000152','gerador','direto','leopoldina'],
+    ['DIVINESIA','18128280000183','gerador','direto','leopoldina'],
+    ['FAZENDA SAO JOAQUIM','02158965649','gerador','direto','bituruna'],
+    ['APA CONFECCOES','33835497000389','gerador','direto','leopoldina'],
+    ['DAMATA BEBIDAS','00952948000147','gerador','direto','leopoldina'],
+    ['CAMPOS GERENCIAMENTO','12392204000102','transportador','consolidador','leopoldina'],
+    ['G & M RECICLAGEM','20640194000105','gerador','direto','leopoldina'],
+    ['METALURGICA CATAGUASES INDUSTRIA','22282586000167','gerador','direto','leopoldina'],
+    ['CT METAL INDUSTRIA E COMERCIO','04386335000140','gerador','direto','leopoldina'],
+    // SINIR — CNPJ a preencher no cadastro quando disponível
+    ['MUNICIPIO DE SANTO ANTONIO DE PADUA','','gerador','lote','sinir'],
+    ['NATIVIDADE','','gerador','lote','sinir'],
+    ['VARRE SAI','','gerador','lote','sinir'],
+  ].map(([nome,cnpj,papel,padrao,sistema]) => ({ nome, cnpj, papel, padrao, sistema }));
+
+  let _concPesagens = [];      // linhas do arquivo da balança
+  let _concResultado = null;   // saída do motor de conciliação
+
+  const concDig  = v => String(v == null ? '' : v).replace(/\D/g, '');
+  const concNorm = s => String(s || '').toUpperCase().replace(/\s+/g, ' ').trim();
+
+  function concCadastro() {
+    try {
+      const c = JSON.parse(localStorage.getItem('mtr_cadastro_v1') || 'null');
+      if (Array.isArray(c) && c.length) return c;
+    } catch {}
+    return CONC_SEED.map(e => ({ ...e }));
+  }
+  function concBaixados() {
+    try { return JSON.parse(localStorage.getItem('mtr_conc_baixados') || '{}'); } catch { return {}; }
+  }
+  function concMarcaBaixado(num) {
+    const b = concBaixados(); b[num] = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('mtr_conc_baixados', JSON.stringify(b));
+  }
+
+  // ── logins por sistema ──
+  function concInit() {
+    const salvo = JSON.parse(localStorage.getItem('mtr_conc_logins') || '{}');
+    const perfis = getPerfis();
+    for (const slot of ['leopoldina', 'bituruna', 'sinir']) {
+      const sel = document.getElementById('conc-login-' + slot);
+      if (!sel) continue;
+      sel.innerHTML = '<option value="">— não usar —</option>' +
+        perfis.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+      // tenta adivinhar pelo nome do perfil; senão usa o que foi salvo
+      const chute = perfis.find(p => concNorm(p.nome).includes(slot.toUpperCase())
+        || (slot === 'sinir' && p.dialect === 'sinir'));
+      sel.value = salvo[slot] ?? (chute ? chute.id : '');
+    }
+  }
+  function concSalvarLogins() {
+    const l = {};
+    for (const slot of ['leopoldina', 'bituruna', 'sinir'])
+      l[slot] = document.getElementById('conc-login-' + slot).value;
+    localStorage.setItem('mtr_conc_logins', JSON.stringify(l));
+  }
+  function concAuthDe(perfilId) {
+    const p = getPerfis().find(x => x.id === perfilId);
+    let c = {}; try { c = JSON.parse(localStorage.getItem('mtr_auth_' + perfilId) || '{}'); } catch {}
+    const dialect = p?.dialect || 'feam';
+    const auth = dialect === 'sinir'
+      ? { cpfCnpj: c.cpfCnpj, senha: c.senha, unidade: c.unidade }
+      : { pessoaCodigo: c.pessoaCodigo, pessoaCnpj: c.pessoaCnpj, usuarioCpf: c.usuarioCpf, senha: c.senha };
+    const ok = dialect === 'sinir'
+      ? !!(c.cpfCnpj && c.unidade && c.senha)
+      : !!(c.pessoaCodigo && c.pessoaCnpj && c.usuarioCpf && c.senha);
+    return { auth, apiBase: c.apiBase || p?.url || '', dialect, ok, nome: p?.nome || perfilId };
+  }
+
+  // ── datas ──
+  function concIso(v) {                       // qualquer formato da API → 'YYYY-MM-DD'
+    if (v == null || v === '') return '';
+    if (typeof v === 'number') { const d = new Date(v); return isNaN(d) ? '' : d.toISOString().slice(0, 10); }
+    const s = String(v);
+    if (/^\d{8}$/.test(s)) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) { const p = s.slice(0,10).split('/'); return `${p[2]}-${p[1]}-${p[0]}`; }
+    if (/^\d{12,}$/.test(s)) { const d = new Date(+s); return isNaN(d) ? '' : d.toISOString().slice(0, 10); }
+    return '';
+  }
+  function concAddDias(iso, n) {
+    const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  const concDifDias = (a, b) => Math.round((new Date(a + 'T12:00:00') - new Date(b + 'T12:00:00')) / 86400000);
+
+  // ── upload (aceita vários arquivos — ex.: mês partido em dois relatórios) ──
+  function concLerPlanilha(buf) {
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+    const hdr = (rows[0] || []).map(h => concNorm(h));
+    const col = frag => hdr.findIndex(h => h.includes(frag));
+    const iPes = col('PESAGEM'), iPla = col('PLACA'), iGer = col('GERADOR'),
+          iEnt = col('ENTRADA'), iLiq = col('LÍQUIDO') >= 0 ? col('LÍQUIDO') : col('LIQUIDO'),
+          iAte = col('ATERRO');
+    if (iGer < 0 || iEnt < 0 || iLiq < 0) throw new Error('colunas Gerador / Data de entrada / Peso Líquido não encontradas');
+    return rows.slice(1).filter(r => r[iGer] != null && r[iLiq] != null).map(r => {
+      const dtRaw = r[iEnt];
+      const dt = dtRaw instanceof Date
+        ? new Date(dtRaw.getTime() - dtRaw.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+        : concIso(dtRaw);
+      return {
+        n: r[iPes] ?? '', placa: concNorm(r[iPla] || '').replace(/[^A-Z0-9]/g, ''),
+        gerLabel: concNorm(r[iGer]), dt, kg: Number(r[iLiq]) || 0,
+        t: (Number(r[iLiq]) || 0) / 1000, aterro: concNorm(r[iAte] || ''),
+      };
+    }).filter(p => p.dt && p.kg > 0);
+  }
+  async function concUpload(event) {
+    const files = [...(event.target.files || [])];
+    if (!files.length) return;
+    try {
+      const todas = [];
+      for (const f of files) todas.push(...concLerPlanilha(await f.arrayBuffer()));
+      if (!todas.length) { alert('Nenhuma pesagem válida encontrada.'); return; }
+      _concPesagens = todas.map((p, k) => ({ ...p, id: k }));
+      const datas = _concPesagens.map(p => p.dt).sort();
+      const ats = [...new Set(_concPesagens.map(p => p.aterro))].filter(Boolean);
+      document.getElementById('conc-upload-label').textContent =
+        `✅ ${files.map(f => f.name).join(' + ')}`;
+      const info = document.getElementById('conc-file-info');
+      info.style.display = 'block';
+      info.textContent = `${_concPesagens.length} pesagens · ${datas[0].split('-').reverse().join('/')} a ${datas[datas.length-1].split('-').reverse().join('/')} · ${(_concPesagens.reduce((s,p)=>s+p.t,0)).toFixed(1)} t · Aterros: ${ats.join(', ') || '—'}`;
+    } catch (err) {
+      alert('Falha ao ler o arquivo: ' + err.message);
+    }
+  }
+
+  // ── busca de MTRs nos sistemas ──
+  async function concBuscar() {
+    if (!_concPesagens.length) { showResponse('resp-conc', '❌ Carregue primeiro o arquivo da balança.', true); return; }
+    concSalvarLogins();
+    const btn = document.getElementById('btn-conc-buscar');
+    btn.disabled = true; btn.textContent = 'Buscando…';
+    document.getElementById('resp-conc').className = 'response-box';
+    document.getElementById('conc-resultados').style.display = 'none';
+
+    const datas = _concPesagens.map(p => p.dt).sort();
+    const ini = concAddDias(datas[0], -20);                       // lote é emitido antes
+    const fim = concAddDias(datas[datas.length - 1], 1);          // dataFim é exclusivo
+    const logins = JSON.parse(localStorage.getItem('mtr_conc_logins') || '{}');
+    const avisos = [];
+    const buscas = [];
+
+    for (const slot of ['leopoldina', 'bituruna']) {
+      if (!logins[slot]) { avisos.push(`Login de ${slot} não configurado — pesagens desse aterro ficarão sem par.`); continue; }
+      const a = concAuthDe(logins[slot]);
+      if (!a.ok) { avisos.push(`Credenciais incompletas em "${a.nome}" — configure em ⚙ Configurações.`); continue; }
+      buscas.push(fetch(apiURL('consulta'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataInicio: ini.replace(/-/g, ''), dataFim: fim.replace(/-/g, ''), auth: a.auth, apiBase: a.apiBase, dialect: a.dialect }),
+      }).then(r => r.json()).then(j => ({ slot, j })).catch(e => ({ slot, erro: e.message })));
+    }
+    const numsSinir = (document.getElementById('conc-numeros-sinir').value || '')
+      .split(/[\s,;]+/).map(concDig).filter(Boolean);
+    if (numsSinir.length) {
+      if (!logins.sinir) avisos.push('Números do SINIR informados, mas nenhum login SINIR selecionado.');
+      else {
+        const a = concAuthDe(logins.sinir);
+        if (!a.ok) avisos.push(`Credenciais incompletas em "${a.nome}".`);
+        else buscas.push(fetch(apiURL('consulta'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numeros: numsSinir, auth: a.auth, apiBase: a.apiBase, dialect: a.dialect }),
+        }).then(r => r.json()).then(j => ({ slot: 'sinir', j })).catch(e => ({ slot: 'sinir', erro: e.message })));
+      }
+    }
+    if (!buscas.length) {
+      showResponse('resp-conc', '❌ Nenhum login utilizável. ' + avisos.join(' '), true);
+      btn.disabled = false; btn.textContent = 'Buscar MTRs e conciliar'; return;
+    }
+
+    const respostas = await Promise.all(buscas);
+    const baixados = concBaixados();
+    const manifests = [], armaz = [];
+    let jaBaixados = 0;
+    for (const r of respostas) {
+      if (r.erro) { avisos.push(`Consulta ${r.slot}: ${r.erro}`); continue; }
+      if (r.j?.mensagem && r.j.mensagem.includes('❌')) { avisos.push(`Consulta ${r.slot}: ${r.j.mensagem}`); }
+      for (const m of (r.j?.manifests || [])) {
+        const num = String(m.manifestoCodigo || '');
+        if (!num) continue;
+        if (baixados[num]) { jaBaixados++; continue; }
+        const sit = String(m.situacao || '');
+        const norm = {
+          num, sistema: r.slot, dt: concIso(m.manifDataExpedicao),
+          cnpjGer: concDig(m.cnpGerador), cnpjTransp: concDig(m.cnpTransportador),
+          situacao: sit, itens: m.itens || [], raw: m, usado: false,
+        };
+        norm.t = concIndicadoT(norm);
+        if (/armaz/i.test(sit)) armaz.push(norm);
+        else if (/receb|cancel/i.test(sit)) continue;
+        else manifests.push(norm);
+      }
+    }
+    if (jaBaixados) avisos.push(`${jaBaixados} MTR(s) ignorado(s): já baixados por aqui anteriormente.`);
+
+    _concResultado = concConciliar(_concPesagens, manifests, concCadastro());
+    _concResultado.armaz = armaz;
+    _concResultado.avisos = avisos;
+    concRender();
+    btn.disabled = false; btn.textContent = 'Buscar MTRs e conciliar';
+  }
+
+  // total indicado do MTR em toneladas; null quando alguma unidade não é conversível
+  function concIndicadoT(m) {
+    let total = 0;
+    for (const it of m.itens) {
+      const q = Number(it.quantidade) || 0;
+      const sigla = concNorm(it.unidadeSigla || '');
+      if (sigla) {
+        if (/^T/.test(sigla)) total += q;
+        else if (/KG/.test(sigla)) total += q / 1000;
+        else return null;
+      } else {
+        const u = Number(it.codigoUnidade);
+        if (u === 4) total += q;                 // tonelada (FEAM)
+        else if (u === 3) total += q / 1000;     // kg (FEAM)
+        else return null;
+      }
+    }
+    return total;
+  }
+
+  // ── motor ──
+  function concConciliar(pesagens, manifests, cadastro) {
+    const porNome = {};
+    for (const c of cadastro) if (c.nome) porNome[concNorm(c.nome)] = c;
+
+    const res = { propostas: [], semPar: [], sobra: [], avisos: [] };
+    const rotear = p => {
+      const cad = porNome[p.gerLabel] || null;
+      const sistema = cad?.sistema || (/BITURUNA/.test(p.aterro) ? 'bituruna' : 'leopoldina');
+      return { ...p, cad, sistema };
+    };
+    const todas = pesagens.map(rotear).sort((a, b) => a.dt.localeCompare(b.dt) || a.id - b.id);
+
+    const candidatos = (p, cad) => manifests.filter(m => !m.usado && m.sistema === p.sistema
+      && (cad.papel === 'transportador' ? m.cnpjTransp : m.cnpjGer) === concDig(cad.cnpj));
+
+    // agrupa pesagens por entrada de cadastro (o padrão 'lote' precisa da série toda)
+    const grupos = new Map();
+    for (const p of todas) {
+      if (!p.cad || !concDig(p.cad.cnpj)) {
+        res.semPar.push({ p, motivo: p.cad ? 'Cadastro sem CNPJ — preencha em ⚙ Cadastro' : 'Gerador não cadastrado — adicione em ⚙ Cadastro' });
+        continue;
+      }
+      const k = p.cad.nome;
+      if (!grupos.has(k)) grupos.set(k, { cad: p.cad, pes: [] });
+      grupos.get(k).pes.push(p);
+    }
+
+    const propor = (p, mtrs) => {
+      const soma = mtrs.reduce((s, m) => s + (m.t ?? 0), 0);
+      const semUnidade = mtrs.some(m => m.t == null);
+      const dif = (!semUnidade && soma > 0) ? Math.abs(soma - p.t) / p.t : null;
+      const cor = semUnidade || dif == null ? 'vermelha'
+                : dif <= CONC_TOL_VERDE ? 'verde'
+                : dif <= CONC_TOL_AMARELA ? 'amarela' : 'vermelha';
+      mtrs.forEach(m => m.usado = true);
+      res.propostas.push({ p, mtrs, soma, dif, cor, semUnidade, checked: cor !== 'vermelha' });
+    };
+
+    for (const { cad, pes } of grupos.values()) {
+      if (cad.padrao === 'lote') {
+        // fila cronológica: junta MTRs até a soma parar de melhorar
+        const fila = candidatos(pes[0], cad).sort((a, b) => a.dt.localeCompare(b.dt) || a.num.localeCompare(b.num));
+        for (const p of pes) {
+          if (!fila.length) { res.semPar.push({ p, motivo: 'MTRs do lote esgotados' }); continue; }
+          const grupo = [fila.shift()];
+          let soma = grupo[0].t ?? 0;
+          while (fila.length && fila[0].t != null
+                 && Math.abs(soma + fila[0].t - p.t) < Math.abs(soma - p.t)) {
+            const m = fila.shift(); grupo.push(m); soma += m.t;
+          }
+          propor(p, grupo);
+        }
+      } else {
+        for (const p of pes) {
+          const cands = candidatos(p, cad).filter(m => {
+            const d = concDifDias(p.dt, m.dt);
+            return d >= 0 && d <= 1;                    // emitido no dia ou na véspera
+          });
+          if (!cands.length) { res.semPar.push({ p, motivo: 'Nenhum MTR pendente do CNPJ no dia/véspera' }); continue; }
+          if (cad.padrao === 'consolidador') propor(p, cands);
+          else {
+            // direto: 1 candidato casa; vários → o de peso mais próximo
+            const ord = cands.slice().sort((a, b) => Math.abs((a.t ?? 1e9) - p.t) - Math.abs((b.t ?? 1e9) - p.t));
+            propor(p, [ord[0]]);
+          }
+        }
+      }
+    }
+
+    res.sobra = manifests.filter(m => !m.usado);
+    return res;
+  }
+
+  // ── renderização ──
+  function concRender() {
+    const r = _concResultado;
+    document.getElementById('conc-resultados').style.display = 'block';
+    const nVerde = r.propostas.filter(x => x.cor === 'verde').length;
+    const nAmar  = r.propostas.filter(x => x.cor === 'amarela').length;
+    const nVerm  = r.propostas.filter(x => x.cor === 'vermelha').length;
+    document.getElementById('conc-resumo').innerHTML =
+      `<strong>${r.propostas.length}</strong> proposta(s) — ` +
+      `<span style="color:#276221">${nVerde} fecham</span> · ` +
+      `<span style="color:#b45309">${nAmar} próximas</span> · ` +
+      `<span style="color:#c0392b">${nVerm} divergem</span> · ` +
+      `${r.semPar.length} pesagem(ns) sem par · ${r.sobra.length} MTR(s) sem pesagem · ${r.armaz.length} em armaz. temporário` +
+      (r.avisos.length ? `<br><span style="color:#b45309">⚠ ${r.avisos.join(' · ')}</span>` : '');
+
+    const CHIP = { verde: ['#276221', 'fecha'], amarela: ['#b45309', 'próximo'], vermelha: ['#c0392b', 'diverge'] };
+    const tb = document.getElementById('conc-tbody-propostas');
+    tb.innerHTML = r.propostas.map((x, i) => {
+      const [cor, rot] = CHIP[x.cor];
+      const mtrsHtml = x.mtrs.map(m => `<div style="white-space:nowrap"><strong>${m.num}</strong> <span style="color:#718096;font-size:.75rem">${m.dt.split('-').reverse().join('/')}</span></div>`).join('');
+      const indHtml = x.semUnidade ? '<span style="color:#c0392b">unid.?</span>'
+        : x.mtrs.map(m => `<div>${(m.t ?? 0).toFixed(3)}</div>`).join('');
+      return `<tr>
+        <td><input type="checkbox" id="conc-ck-${i}" ${x.checked ? 'checked' : ''}></td>
+        <td>${x.p.n || '—'}</td>
+        <td style="white-space:nowrap">${x.p.dt.split('-').reverse().join('/')}</td>
+        <td style="font-size:.8rem">${x.p.gerLabel}</td>
+        <td><strong>${x.p.t.toFixed(3)}</strong></td>
+        <td>${mtrsHtml}</td>
+        <td style="font-size:.8rem">${indHtml}${x.mtrs.length > 1 ? `<div style="border-top:1px solid #e2e8f0;margin-top:2px">Σ ${x.soma.toFixed(3)}</div>` : ''}</td>
+        <td style="color:${cor};font-weight:700">${x.dif == null ? '—' : (x.dif * 100).toFixed(1) + '%'}</td>
+        <td><span class="status-wait" id="conc-st-${i}" style="color:${cor}">${rot}</span></td>
+      </tr>`;
+    }).join('');
+    document.getElementById('conc-sec-propostas').style.display = r.propostas.length ? 'block' : 'none';
+
+    document.getElementById('conc-tbody-sempar').innerHTML = r.semPar.map(({ p, motivo }) =>
+      `<tr><td>${p.n || '—'}</td><td>${p.dt.split('-').reverse().join('/')}</td><td style="font-size:.8rem">${p.gerLabel}</td><td>${p.t.toFixed(3)}</td><td style="font-size:.8rem;color:#b45309">${motivo}</td></tr>`).join('');
+    document.getElementById('conc-sec-sempar').style.display = r.semPar.length ? 'block' : 'none';
+
+    document.getElementById('conc-tbody-sobra').innerHTML = r.sobra.map(m =>
+      `<tr><td><strong>${m.num}</strong></td><td>${m.dt ? m.dt.split('-').reverse().join('/') : '—'}</td>
+       <td style="font-size:.75rem;font-family:monospace">${m.cnpjGer || '—'}</td>
+       <td style="font-size:.75rem;font-family:monospace">${m.cnpjTransp || '—'}</td>
+       <td>${m.t == null ? '—' : m.t.toFixed(3)}</td><td>${m.sistema}</td></tr>`).join('');
+    document.getElementById('conc-sec-sobra').style.display = r.sobra.length ? 'block' : 'none';
+
+    document.getElementById('conc-tbody-armaz').innerHTML = r.armaz.map(m =>
+      `<tr><td><strong>${m.num}</strong></td><td>${m.dt ? m.dt.split('-').reverse().join('/') : '—'}</td>
+       <td style="font-size:.75rem;font-family:monospace">${m.cnpjGer || '—'}</td><td style="font-size:.8rem">${m.situacao}</td></tr>`).join('');
+    document.getElementById('conc-sec-armaz').style.display = r.armaz.length ? 'block' : 'none';
+
+    document.getElementById('conc-resultados').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── processamento das baixas ──
+  async function concProcessar() {
+    const r = _concResultado;
+    if (!r) return;
+    const marcadas = r.propostas.map((x, i) => ({ x, i }))
+      .filter(({ i }) => document.getElementById('conc-ck-' + i)?.checked);
+    if (!marcadas.length) { alert('Nenhuma proposta selecionada.'); return; }
+    if (!confirm(`Dar baixa em ${marcadas.length} pesagem(ns), cobrindo ${marcadas.reduce((s, { x }) => s + x.mtrs.length, 0)} MTR(s)?`)) return;
+
+    const btn = document.getElementById('btn-conc-processar');
+    btn.disabled = true;
+    const logins = JSON.parse(localStorage.getItem('mtr_conc_logins') || '{}');
+    let ok = 0, erro = 0;
+
+    for (const { x, i } of marcadas) {
+      const st = document.getElementById('conc-st-' + i);
+      st.className = 'status-wait'; st.style.color = ''; st.textContent = '⏳ Enviando…';
+      const auth = concAuthDe(logins[x.p.sistema]);
+      // rateio do peso da balança proporcional à quantidade indicada de cada MTR
+      const soma = x.soma > 0 ? x.soma : null;
+      let falhou = null;
+
+      for (const m of x.mtrs) {
+        const recebidaT = x.mtrs.length === 1 ? x.p.t
+          : (soma ? x.p.t * ((m.t ?? 0) / soma) : x.p.t / x.mtrs.length);
+        const corpo = concPayloadBaixa(m, x.p, recebidaT, auth);
+        if (!corpo) { falhou = `MTR ${m.num}: unidade não conversível`; break; }
+        try {
+          const resp = await fetch(apiURL('baixa'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corpo),
+          });
+          const body = await resp.text();
+          if (body.includes('❌')) { falhou = `MTR ${m.num}: ${body.replace(/^[❌\s]+/, '').slice(0, 90)}`; break; }
+          concMarcaBaixado(m.num);
+        } catch (e) { falhou = `MTR ${m.num}: ${e.message}`; break; }
+      }
+      if (falhou) { erro++; st.className = 'status-err'; st.textContent = '❌ ' + falhou; }
+      else { ok++; st.className = 'status-ok'; st.textContent = '✅ Baixado'; const ck = document.getElementById('conc-ck-' + i); if (ck) { ck.checked = false; ck.disabled = true; } }
+      document.getElementById('conc-proc-label').textContent = `✅ ${ok}  ❌ ${erro}  (${ok + erro}/${marcadas.length})`;
+    }
+    btn.disabled = false;
+  }
+
+  // monta o corpo da baixa no formato do dialeto; devolve null se a unidade não converte
+  function concPayloadBaixa(m, pesagem, recebidaT, auth) {
+    const dataAAAAMMDD = pesagem.dt.replace(/-/g, '');
+    const itens = m.raw.itens || [];
+    const totalInd = itens.reduce((s, it) => s + (Number(it.quantidade) || 0), 0);
+    // converte a fatia recebida (em t) para a unidade de cada item
+    const qtNaUnidade = (it, fatiaT) => {
+      const sigla = concNorm(it.unidadeSigla || '');
+      if (sigla) { if (/^T/.test(sigla)) return fatiaT; if (/KG/.test(sigla)) return fatiaT * 1000; return null; }
+      const u = Number(it.codigoUnidade);
+      if (u === 4) return fatiaT;
+      if (u === 3) return fatiaT * 1000;
+      return null;
+    };
+    const fatiaDe = it => totalInd > 0 ? recebidaT * ((Number(it.quantidade) || 0) / totalInd) : recebidaT / (itens.length || 1);
+
+    if (auth.dialect === 'sinir') {
+      const lista = itens.map(it => {
+        const q = qtNaUnidade(it, fatiaDe(it));
+        return q == null ? null : { marQuantidadeRecebida: +q.toFixed(3) };
+      });
+      if (lista.some(v => v == null)) return null;
+      return {
+        manNumero: m.num, dataRecebimento: dataAAAAMMDD,
+        nomeMotorista: m.raw.nomeMotorista || '', placaVeiculo: m.raw.placaVeiculo || pesagem.placa || '',
+        nomeResponsavelRecebimento: 'Victoria Abrahão',
+        observacoes: '', justificativa: 'Peso apurado em balança',
+        itens: lista,
+        auth: auth.auth, apiBase: auth.apiBase, dialect: auth.dialect,
+      };
+    }
+    const lista = itens.map(it => {
+      const q = qtNaUnidade(it, fatiaDe(it));
+      return q == null ? null : {
+        codigoSequencial: it.codigoSequencial, qtdRecebida: +q.toFixed(3), residuo: it.residuo,
+        codigoTecnologia: it.codigoTecnologia, codigoTipoEstado: it.codigoTipoEstado,
+      };
+    });
+    if (!lista.length || lista.some(v => v == null)) return null;
+    return {
+      'Número do Manifesto (10 dígitos)': m.num,
+      'CNPJ do Gerador': m.cnpjGer, 'CNPJ do Transportador': m.cnpjTransp,
+      'Nome do Responsável pelo Recebimento': 'Victoria Abrahão',
+      'Cargo do Responsável': 'Analista ambiental',
+      'Data de Recebimento (AAAAMMDD)': dataAAAAMMDD,
+      'Observações do Recebimento': 'Peso apurado em balança',
+      'Nome do Motorista': m.raw.nomeMotorista || '',
+      'Placa do Veículo': m.raw.placaVeiculo || pesagem.placa || '',
+      itens: lista,
+      auth: auth.auth, apiBase: auth.apiBase, dialect: auth.dialect,
+    };
+  }
+
+  // ── cadastro (modal) ──
+  function concAbrirCadastro() {
+    const tb = document.getElementById('cad-tbody');
+    tb.innerHTML = '';
+    concCadastro().forEach(e => concAddCadastro(e));
+    document.getElementById('modal-cadastro').classList.add('open');
+    document.getElementById('modal-cadastro').style.display = 'flex';
+  }
+  function concAddCadastro(e) {
+    e = e && e.nome !== undefined ? e : { nome: '', cnpj: '', papel: 'gerador', padrao: 'direto', sistema: 'leopoldina' };
+    const tr = document.createElement('tr');
+    const sel = (opts, val) => `<select style="width:100%;padding:5px;border:1px solid #cbd5e0;border-radius:6px;font-size:.8rem">`
+      + opts.map(([v, l]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${l}</option>`).join('') + '</select>';
+    tr.innerHTML = `
+      <td><input type="text" value="${e.nome.replace(/"/g, '&quot;')}" style="width:100%;padding:5px;border:1px solid #cbd5e0;border-radius:6px;font-size:.8rem"></td>
+      <td><input type="text" value="${e.cnpj}" placeholder="só números" maxlength="14" style="width:130px;padding:5px;border:1px solid #cbd5e0;border-radius:6px;font-size:.8rem;font-family:monospace"></td>
+      <td>${sel([['gerador','Gerador'],['transportador','Transportador']], e.papel)}</td>
+      <td>${sel([['direto','Direto'],['consolidador','Consolidador'],['lote','Lote']], e.padrao)}</td>
+      <td>${sel([['leopoldina','FEAM Leopoldina'],['bituruna','FEAM Bituruna'],['sinir','SINIR']], e.sistema)}</td>
+      <td><button class="btn-modal-cancel" style="padding:4px 8px;color:#c0392b" onclick="this.closest('tr').remove()">✕</button></td>`;
+    document.getElementById('cad-tbody').appendChild(tr);
+  }
+  function concSalvarCadastro() {
+    const linhas = [...document.querySelectorAll('#cad-tbody tr')].map(tr => {
+      const inp = tr.querySelectorAll('input'); const sels = tr.querySelectorAll('select');
+      return { nome: concNorm(inp[0].value), cnpj: concDig(inp[1].value),
+               papel: sels[0].value, padrao: sels[1].value, sistema: sels[2].value };
+    }).filter(e => e.nome);
+    localStorage.setItem('mtr_cadastro_v1', JSON.stringify(linhas));
+    concFecharCadastro();
+  }
+  function concFecharCadastro() {
+    document.getElementById('modal-cadastro').classList.remove('open');
+    document.getElementById('modal-cadastro').style.display = 'none';
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   initSelects();
   checkLastMTR();
   _carregaNomes();
+  concInit();
   initCombo("e-codResiduoIbama-search","e-codResiduoIbama","e-codResiduoIbama-dd","e-codResiduoIbama-sel");
   initCombo("b-codResiduoIbama-search","b-codResiduoIbama","b-codResiduoIbama-dd","b-codResiduoIbama-sel");
 </script>
