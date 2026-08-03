@@ -1017,7 +1017,6 @@
     emitir:   '/api/emitir',
     baixa:    '/api/baixa',
     consulta: '/api/consulta',
-    nomes:    '/api/nomes',
   };
 
   // ── Perfis de acesso (vários logins; cada um com seu sistema/credenciais) ─────
@@ -1916,10 +1915,19 @@
   let _ultimoResultado = [];
   let _nomeMap = {};
 
-  // Nomes de empresa por CNPJ. Quem busca é /api/nomes — a BrasilAPI bloqueia o
-  // IP por minutos se levar uma rajada, então nada de chamá-la direto daqui.
-  // Razão social não muda, então o que já foi resolvido fica guardado no
-  // navegador para sempre: na prática só se busca CNPJ visto pela primeira vez.
+  // Nomes de empresa por CNPJ, via BrasilAPI.
+  //
+  // A busca precisa sair DAQUI, do navegador: a BrasilAPI bloqueia IPs de
+  // datacenter (a Vercel leva 403 sempre), mas atende o IP de quem está usando.
+  // Ela também não usa 429 — ao levar rajada, responde 403 e barra o IP por
+  // vários minutos. Por isso: um CNPJ de cada vez, e ao primeiro 403 para tudo,
+  // em vez de insistir e prolongar o bloqueio.
+  //
+  // O que já foi resolvido fica guardado no navegador para sempre (razão social
+  // não muda), então o dia a dia só consulta CNPJ visto pela primeira vez.
+  const NOMES_PAUSA_MS   = 400;
+  const NOMES_ORCAMENTO  = 20000;
+
   function _carregaNomes() {
     try { _nomeMap = JSON.parse(localStorage.getItem('mtr_nomes') || '{}'); }
     catch { _nomeMap = {}; }
@@ -1928,26 +1936,43 @@
     try { localStorage.setItem('mtr_nomes', JSON.stringify(_nomeMap)); } catch {}
   }
 
+  // Três desfechos: o nome (string, '' quando o CNPJ é inválido ou não existe —
+  // isso vale guardar), BLOQUEADO (pára tudo) e SEM_RESPOSTA (pula só este).
+  const BLOQUEADO    = Symbol('bloqueado');
+  const SEM_RESPOSTA = Symbol('sem-resposta');
+
+  async function _buscaNome(cnpj) {
+    try {
+      const r = await fetch('https://brasilapi.com.br/api/cnpj/v1/' + cnpj);
+      if (r.status === 403 || r.status === 429) return BLOQUEADO;    // IP barrado
+      if (r.status === 400 || r.status === 404) return '';           // inválido / inexistente
+      if (!r.ok) return SEM_RESPOSTA;
+      const d = await r.json();
+      return d.razao_social || '';
+    } catch {
+      return SEM_RESPOSTA;
+    }
+  }
+
   // Devolve só os nomes recém-descobertos, para a tabela ser atualizada.
-  // Nunca guarda vazio: assim um CNPJ que ficou pendente é tentado de novo depois.
   async function resolverNomes(cnpjs) {
     const faltando = [...new Set(cnpjs.map(c => String(c || '').replace(/\D/g, '')))]
-      .filter(c => c.length === 14 && !_nomeMap[c]);
-    if (!faltando.length) return {};
-    try {
-      const res = await fetch(apiURL('nomes'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cnpjs: faltando }),
-      });
-      if (!res.ok) return {};
-      const { nomes = {} } = await res.json();
-      Object.entries(nomes).forEach(([cnpj, nome]) => { if (nome) _nomeMap[cnpj] = nome; });
-      _guardaNomes();
-      return nomes;
-    } catch {
-      return {};
+      .filter(c => c.length === 14 && _nomeMap[c] === undefined);
+
+    const novos = {};
+    const inicio = Date.now();
+    let buscas = 0;
+    for (const cnpj of faltando) {
+      if (Date.now() - inicio > NOMES_ORCAMENTO) break;
+      if (buscas++) await new Promise(r => setTimeout(r, NOMES_PAUSA_MS));
+      const nome = await _buscaNome(cnpj);
+      if (nome === BLOQUEADO)    break;      // o resto fica pra próxima consulta
+      if (nome === SEM_RESPOSTA) continue;   // falha isolada não derruba os demais
+      _nomeMap[cnpj] = nome;
+      novos[cnpj] = nome;
     }
+    if (Object.keys(novos).length) _guardaNomes();
+    return novos;
   }
 
   function toAPIDate(isoDate) {
@@ -2067,7 +2092,7 @@
     // Os nomes que faltam entram na tabela quando chegarem — sem segurar a tela.
     const semNome = manifests
       .flatMap(m => [m.cnpGerador, m.cnpTransportador])
-      .filter(c => c && !_nomeMap[c]);
+      .filter(c => c && _nomeMap[c] === undefined);
     if (semNome.length) {
       count.textContent = `${manifests.length} MTR(s) encontrado(s)${sufixo} — buscando nomes…`;
       const nomes = await resolverNomes(semNome);
@@ -2075,7 +2100,7 @@
         if (!nome) return;
         tbody.querySelectorAll(`[data-cnpj="${cnpj}"]`).forEach(el => { el.textContent = nome; });
       });
-      const faltam = new Set(semNome.filter(c => !_nomeMap[c])).size;
+      const faltam = new Set(semNome.filter(c => _nomeMap[c] === undefined)).size;
       count.textContent = `${manifests.length} MTR(s) encontrado(s)${sufixo}`
         + (faltam ? ` — ${faltam} nome(s) não resolvido(s), tente de novo em alguns minutos` : '');
     }
