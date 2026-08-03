@@ -1,0 +1,6 @@
+{
+  "name": "e-mtr",
+  "private": true,
+  "type": "module",
+  "description": "Frontend estático + funções serverless que falam com as APIs de MTR (FEAM-MG, SINIR, INEA-RJ)."
+}

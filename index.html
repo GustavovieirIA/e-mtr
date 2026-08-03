@@ -1009,20 +1009,14 @@
 </footer>
 
 <script>
-  // ── Webhooks por dialeto de API ──────────────────────────────────────────────
-  // FEAM-MG usa a API antiga (/api). SINIR e INEA usam a API nova (/apiws/rest).
-  const WEBHOOK_BASE = 'https://n8nwebhook.iepgroup.uk/n8nwebhook/';
-  const WEBHOOKS = {
-    feam: {
-      emitir:   '831fe3a5-9651-4b0f-9afd-e889cca332e6',
-      baixa:    'e2ee3b8d-8e87-4a68-92de-8f632f257538',
-      consulta: 'c7e4a2f1-3b8d-4c9e-a5f2-d1b6c8e3f7a4',
-    },
-    sinir: {
-      emitir:   '85efa7e1-0a8b-4450-89db-0ebe36afafb3',
-      baixa:    '68041992-2d32-48b6-9b97-b56289df7fbc',
-      consulta: '38ae7d34-fc67-443c-8db1-ceb24cab63a4',
-    },
+  // ── Endpoints ────────────────────────────────────────────────────────────────
+  // Funções serverless em /api (mesmo domínio, sem CORS). Cada uma decide o que
+  // fazer pelo campo `dialect` do corpo: FEAM-MG usa a API antiga (/api),
+  // SINIR e INEA usam a API nova (/apiws/rest).
+  const ENDPOINTS = {
+    emitir:   '/api/emitir',
+    baixa:    '/api/baixa',
+    consulta: '/api/consulta',
   };
 
   // ── Perfis de acesso (vários logins; cada um com seu sistema/credenciais) ─────
@@ -1057,7 +1051,7 @@
   function dialetoAtivo() { return perfilAtivo().dialect || 'feam'; }
   function _cred()        { return JSON.parse(localStorage.getItem('mtr_auth_' + sistemaAtivo()) || '{}'); }
 
-  function webhookURL(feature) { return WEBHOOK_BASE + (WEBHOOKS[dialetoAtivo()]?.[feature] || ''); }
+  function apiURL(feature) { return ENDPOINTS[feature]; }
 
   function _camposObrigatorios() {
     return dialetoAtivo() === 'sinir'
@@ -1507,7 +1501,7 @@
       'Seu Código de Referência':           opt(val('e-seuCodigoReferencia')),
       'Observações':                        opt(val('e-observacoes')),
     };
-    postJSON(webhookURL('emitir'), payload, 'btn-emitir', 'resp-emitir');
+    postJSON(apiURL('emitir'), payload, 'btn-emitir', 'resp-emitir');
   }
 
   function submitBaixa() {
@@ -1531,7 +1525,7 @@
       'Código de Estado Físico':              numVal('b-codEstadoFisico'),
       'Observações do Recebimento':           opt(val('b-observacoes')),
     };
-    postJSON(webhookURL('baixa'), payload, 'btn-baixa', 'resp-baixa');
+    postJSON(apiURL('baixa'), payload, 'btn-baixa', 'resp-baixa');
   }
 
 
@@ -1648,7 +1642,7 @@
     document.getElementById('m-resp').textContent = '';
 
     try {
-      const res  = await fetch(webhookURL('baixa'), {
+      const res  = await fetch(apiURL('baixa'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(corpo)
@@ -1858,11 +1852,11 @@
 
       let payload;
       if (dialetoAtivo() === 'sinir') {
-        // SINIR: o workflow consulta o MTR e pega os códigos sozinho.
+        // SINIR: /api/baixa consulta o MTR e pega os códigos sozinho.
         // Mandamos só número + quantidade recebida + data + dados do recebimento.
         payload = {
           manNumero:                  _getMTR(r),
-          dataRecebimento:            _csvDateToAPI(dataReceb),   // AAAAMMDD; workflow converte p/ epoch
+          dataRecebimento:            _csvDateToAPI(dataReceb),   // AAAAMMDD; a função converte p/ epoch
           qtdRecebida:                qtReceb,
           nomeMotorista:              motorista,
           placaVeiculo:               placa,
@@ -1889,7 +1883,7 @@
       }
 
       try {
-        const res  = await fetch(webhookURL('baixa'), {
+        const res  = await fetch(apiURL('baixa'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...payload, ...getAuthPayload() })
@@ -2167,7 +2161,7 @@
     document.getElementById('resp-consulta').className = 'response-box';
 
     try {
-      const res = await fetch(webhookURL('consulta'), {
+      const res = await fetch(apiURL('consulta'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(corpo)
@@ -2182,8 +2176,8 @@
       }
     } catch (err) {
       const msg = err.name === 'AbortError'
-        ? '❌ Timeout — o n8n demorou mais de 3 min para responder. Verifique os logs do workflow.'
-        : '❌ Sem resposta do n8n (Failed to fetch). Possíveis causas: workflow desativado, servidor offline ou erro de CORS. Verifique se o workflow 3 está ATIVO no n8n.';
+        ? '❌ Timeout na consulta. Se o período for longo, tente buscar em intervalos menores.'
+        : '❌ Sem resposta do servidor (Failed to fetch). Se o período for longo, a consulta pode ter estourado o tempo limite — tente um intervalo menor.';
       showResponse('resp-consulta', msg, true);
     } finally {
       btn.disabled = false; btn.textContent = 'Buscar MTRs';
