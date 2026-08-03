@@ -2067,8 +2067,9 @@
     tbody.innerHTML = manifests.map(m => {
       const codigo     = m.manifestoCodigo ?? m.codigo ?? '—';
       const dataEmis   = formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao);
-      const cnpjGer    = m.cnpGerador    ?? '—';
-      const cnpjTransp = m.cnpTransportador ?? '—';
+      // `||` e não `??`: a API às vezes manda string vazia, que deve virar '—'
+      const cnpjGer    = m.cnpGerador       || '—';
+      const cnpjTransp = m.cnpTransportador || '—';
       const nomeGer    = m.nomeGerador       || _nomeMap[cnpjGer]    || cnpjGer;
       const nomeTransp = m.nomeTransportador || _nomeMap[cnpjTransp] || cnpjTransp;
       const situacao   = situacaoBadge(m.situacaoManifestoCodigo ?? m.situacao ?? m.manifSituacao ?? m.status);
@@ -2123,8 +2124,10 @@
     const dataRows = _ultimoResultado.map(m => {
       const cg         = m.cnpGerador        ?? '';
       const ct         = m.cnpTransportador   ?? '';
-      const nomeGer    = m.nomeGerador       || _nomeMap[cg] || '';
-      const nomeTransp = m.nomeTransportador || _nomeMap[ct] || '';
+      // Sem nome resolvido, repete o CNPJ em vez de deixar a célula vazia —
+      // é o que a tabela da tela faz, e uma coluna em branco não ajuda a conferir.
+      const nomeGer    = m.nomeGerador       || _nomeMap[cg] || String(cg || '');
+      const nomeTransp = m.nomeTransportador || _nomeMap[ct] || String(ct || '');
       const fi         = (m.itens || [])[0]  || {};
       const motorista  = (m.nomeMotorista?.trim()) || 'Claudio';
       // SINIR manda a sigla (TON, KG…) — os códigos do SINIR são diferentes do FEAM,
