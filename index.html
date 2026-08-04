@@ -1021,10 +1021,17 @@
               <tbody id="conc-tbody-propostas"></tbody>
             </table>
           </div>
-          <div style="display:flex;gap:10px;align-items:center;margin-top:14px">
+          <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
+            <button class="btn-export" onclick="concExportarExcel()">⬇ Exportar conferência (Excel)</button>
             <button class="btn-massa" id="btn-conc-processar" onclick="concProcessar()">▶ Dar baixa nas selecionadas</button>
             <span id="conc-proc-label" style="font-size:.82rem;color:#4a5568"></span>
           </div>
+          <p style="font-size:.78rem;color:#718096;margin:8px 0 0">
+            A planilha exportada sai no formato da <strong>Baixa em Massa</strong>, já preenchida com data e peso
+            rateado da balança. Confira e corrija no Excel, selecione o sistema correspondente no topo da página
+            e suba na aba Dar Baixa. Linhas divergentes e MTRs sem pesagem vêm <strong>sem data</strong> — só são
+            processados se você preencher.
+          </p>
         </div>
 
         <div id="conc-sec-sempar" style="display:none">
@@ -2887,6 +2894,93 @@
       document.getElementById('conc-proc-label').textContent = `✅ ${ok}  ❌ ${erro}  (${ok + erro}/${marcadas.length})`;
     }
     btn.disabled = false;
+  }
+
+  // ── exportação para o fluxo Excel (Baixa em Massa) ───────────────────────────
+  // Gera a MESMA planilha da baixa em massa, já preenchida com a data da pesagem
+  // e o peso rateado da balança. Um arquivo por sistema, porque a Baixa em Massa
+  // usa o login ativo no topo da página. Linha sem data é pulada no processamento,
+  // então propostas divergentes e MTRs sem pesagem saem com a data em branco:
+  // só entram se o operador preencher conscientemente.
+  const CONC_SLOT_NOME = { leopoldina: 'FEAM Leopoldina', bituruna: 'FEAM Bituruna', sinir: 'SINIR', inea: 'INEA-RJ' };
+
+  function concExportarExcel() {
+    const r = _concResultado;
+    if (!r) return;
+
+    const dtBR = iso => iso ? iso.split('-').reverse().join('/') : '';
+    const linhas = [];   // { sistema, row }
+
+    for (const x of r.propostas) {
+      const aprovada = x.cor !== 'vermelha';
+      const status = x.cor === 'verde' ? `✓ fecha (${(x.dif*100).toFixed(1)}%)`
+                   : x.cor === 'amarela' ? `~ próximo (${(x.dif*100).toFixed(1)}%)`
+                   : `✗ diverge${x.dif != null ? ` (${(x.dif*100).toFixed(0)}%)` : ''} — confira e preencha a data`;
+      for (const m of x.mtrs) {
+        const fatiaT = x.mtrs.length === 1 ? x.p.t
+          : (x.soma > 0 ? x.p.t * ((m.t ?? 0) / x.soma) : x.p.t / x.mtrs.length);
+        const fi = (m.raw.itens || [])[0] || {};
+        linhas.push({ sistema: x.p.sistema, row: {
+          'Nº MTR': m.num,
+          'Data Emissão': dtBR(m.dt),
+          'CNPJ Gerador': m.cnpjGer, 'Nome Gerador': m.raw.nomeGerador || _nomeMap[m.cnpjGer] || '',
+          'CNPJ Transportador': m.cnpjTransp, 'Nome Transportador': m.raw.nomeTransportador || _nomeMap[m.cnpjTransp] || '',
+          'Situação': m.situacao || 'Emitido (aguarda baixa)',
+          'Data de recebimento': aprovada ? dtBR(x.p.dt) : '',
+          'Motorista': m.raw.nomeMotorista || '',
+          'Placa': m.raw.placaVeiculo || x.p.placa || '',
+          'Responsável pelo recebimento': 'Victoria Abrahão', 'Cargo': 'Analista ambiental',
+          'Qt. Indicada': m.t ?? '', 'Qt. Recebida': +fatiaT.toFixed(3),
+          'Unidade': 't', 'Tecnologia': fi.codigoTecnologia ?? '',
+          'Justificativa': 'Peso apurado em balança',
+          'Resíduo': fi.residuo ?? '', 'Cód. Estado Físico': fi.codigoTipoEstado ?? '',
+          'Nº Pesagem': x.p.n, 'Data Pesagem': dtBR(x.p.dt), 'Peso Balança (t)': +x.p.t.toFixed(3),
+          'Gerador na balança': x.p.gerLabel, 'Conciliação': status,
+        }});
+      }
+    }
+    for (const m of r.sobra) {
+      const fi = (m.raw.itens || [])[0] || {};
+      linhas.push({ sistema: m.sistema, row: {
+        'Nº MTR': m.num, 'Data Emissão': dtBR(m.dt),
+        'CNPJ Gerador': m.cnpjGer, 'Nome Gerador': m.raw.nomeGerador || _nomeMap[m.cnpjGer] || '',
+        'CNPJ Transportador': m.cnpjTransp, 'Nome Transportador': m.raw.nomeTransportador || _nomeMap[m.cnpjTransp] || '',
+        'Situação': m.situacao || 'Emitido (aguarda baixa)',
+        'Data de recebimento': '', 'Motorista': m.raw.nomeMotorista || '', 'Placa': m.raw.placaVeiculo || '',
+        'Responsável pelo recebimento': 'Victoria Abrahão', 'Cargo': 'Analista ambiental',
+        'Qt. Indicada': m.t ?? '', 'Qt. Recebida': '', 'Unidade': 't',
+        'Tecnologia': fi.codigoTecnologia ?? '', 'Justificativa': 'Peso apurado em balança',
+        'Resíduo': fi.residuo ?? '', 'Cód. Estado Físico': fi.codigoTipoEstado ?? '',
+        'Nº Pesagem': '', 'Data Pesagem': '', 'Peso Balança (t)': '',
+        'Gerador na balança': '', 'Conciliação': '✗ sem pesagem na balança — preencha a data para baixar mesmo assim',
+      }});
+    }
+
+    const sistemas = [...new Set(linhas.map(l => l.sistema))];
+    if (!sistemas.length) { alert('Nada para exportar.'); return; }
+    const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+
+    for (const sistema of sistemas) {
+      const rows = linhas.filter(l => l.sistema === sistema).map(l => l.row);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [{wch:14},{wch:11},{wch:16},{wch:30},{wch:16},{wch:30},{wch:20},
+                     {wch:16},{wch:16},{wch:10},{wch:22},{wch:18},{wch:11},{wch:11},{wch:6},
+                     {wch:10},{wch:24},{wch:10},{wch:14},{wch:10},{wch:12},{wch:14},{wch:30},{wch:40}];
+      XLSX.utils.book_append_sheet(wb, ws, 'Baixas');
+
+      // pesagens sem MTR ficam numa aba própria, só para conferência
+      const semPar = r.semPar.filter(({ p }) => p.sistema === sistema);
+      if (semPar.length) {
+        const ws2 = XLSX.utils.json_to_sheet(semPar.map(({ p, motivo }) => ({
+          'Nº Pesagem': p.n, 'Data': dtBR(p.dt), 'Placa': p.placa,
+          'Gerador na balança': p.gerLabel, 'Peso (t)': +p.t.toFixed(3), 'Motivo': motivo,
+        })));
+        ws2['!cols'] = [{wch:12},{wch:11},{wch:10},{wch:34},{wch:10},{wch:44}];
+        XLSX.utils.book_append_sheet(wb, ws2, 'Pesagens sem MTR');
+      }
+      XLSX.writeFile(wb, `Conciliacao_${CONC_SLOT_NOME[sistema].replace(/[^\w-]/g, '_')}_${hoje}.xlsx`);
+    }
   }
 
   // monta o corpo da baixa no formato do dialeto; devolve null se a unidade não converte
