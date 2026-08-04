@@ -976,11 +976,22 @@
           <label>Login SINIR</label>
           <select id="conc-login-sinir" onchange="concSalvarLogins()"></select>
         </div>
+        <div class="field">
+          <label>Login INEA-RJ</label>
+          <select id="conc-login-inea" onchange="concSalvarLogins()"></select>
+        </div>
       </div>
-      <div class="field">
-        <label>Números de MTR do SINIR <span class="opt">um por linha — o SINIR não lista por período; copie do portal</span></label>
-        <textarea id="conc-numeros-sinir" rows="4" placeholder="331032128975&#10;331032128972&#10;…"
-          style="font-family:monospace;font-size:.85rem"></textarea>
+      <div class="grid">
+        <div class="field">
+          <label>Números de MTR do SINIR <span class="opt">um por linha — a API não lista por período; copie do portal</span></label>
+          <textarea id="conc-numeros-sinir" rows="4" placeholder="331032128975&#10;331032128972&#10;…"
+            style="font-family:monospace;font-size:.85rem"></textarea>
+        </div>
+        <div class="field">
+          <label>Números de MTR do INEA <span class="opt">um por linha — idem; copie do portal do INEA</span></label>
+          <textarea id="conc-numeros-inea" rows="4" placeholder="2118015489&#10;2117945146&#10;…"
+            style="font-family:monospace;font-size:.85rem"></textarea>
+        </div>
       </div>
 
       <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
@@ -2474,7 +2485,8 @@
     ['LATICINIOS PORTO ALEGRE','66301334000103','gerador','direto','bituruna'],
     ['LATICINIOS PORTO ALEGRE (LEITE)','66301334000537','gerador','direto','leopoldina'],
     ['ANGLO AMERICAN','02359572000510','gerador','direto','bituruna'],
-    ['FRIRED - MIRACEMA','11437997000168','gerador','direto','leopoldina'],
+    // FRI RED de Miracema é OUTRA empresa (RJ, INEA) — não confundir com a do FEAM
+    ['FRIRED - MIRACEMA','19780007000100','gerador','direto','inea'],
     ['FRIRED INDUSTRIA DE ALIMENTOS','11437997000168','gerador','direto','leopoldina'],
     ['PONTE NOVA PAPEIS','02625899000244','gerador','direto','leopoldina'],
     ['V MENEZES ME','07596305000157','transportador','consolidador','leopoldina'],
@@ -2516,23 +2528,25 @@
   }
 
   // ── logins por sistema ──
+  const CONC_SLOTS = ['leopoldina', 'bituruna', 'sinir', 'inea'];
+
   function concInit() {
     const salvo = JSON.parse(localStorage.getItem('mtr_conc_logins') || '{}');
     const perfis = getPerfis();
-    for (const slot of ['leopoldina', 'bituruna', 'sinir']) {
+    for (const slot of CONC_SLOTS) {
       const sel = document.getElementById('conc-login-' + slot);
       if (!sel) continue;
       sel.innerHTML = '<option value="">— não usar —</option>' +
         perfis.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
       // tenta adivinhar pelo nome do perfil; senão usa o que foi salvo
-      const chute = perfis.find(p => concNorm(p.nome).includes(slot.toUpperCase())
-        || (slot === 'sinir' && p.dialect === 'sinir'));
+      const chute = perfis.find(p => concNorm(p.nome).includes(slot.toUpperCase()))
+        || (slot === 'sinir' ? perfis.find(p => p.dialect === 'sinir' && !/INEA/.test(concNorm(p.nome))) : null);
       sel.value = salvo[slot] ?? (chute ? chute.id : '');
     }
   }
   function concSalvarLogins() {
     const l = {};
-    for (const slot of ['leopoldina', 'bituruna', 'sinir'])
+    for (const slot of CONC_SLOTS)
       l[slot] = document.getElementById('conc-login-' + slot).value;
     localStorage.setItem('mtr_conc_logins', JSON.stringify(l));
   }
@@ -2633,18 +2647,17 @@
         body: JSON.stringify({ dataInicio: ini.replace(/-/g, ''), dataFim: fim.replace(/-/g, ''), auth: a.auth, apiBase: a.apiBase, dialect: a.dialect }),
       }).then(r => r.json()).then(j => ({ slot, j })).catch(e => ({ slot, erro: e.message })));
     }
-    const numsSinir = (document.getElementById('conc-numeros-sinir').value || '')
-      .split(/[\s,;]+/).map(concDig).filter(Boolean);
-    if (numsSinir.length) {
-      if (!logins.sinir) avisos.push('Números do SINIR informados, mas nenhum login SINIR selecionado.');
-      else {
-        const a = concAuthDe(logins.sinir);
-        if (!a.ok) avisos.push(`Credenciais incompletas em "${a.nome}".`);
-        else buscas.push(fetch(apiURL('consulta'), {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ numeros: numsSinir, auth: a.auth, apiBase: a.apiBase, dialect: a.dialect }),
-        }).then(r => r.json()).then(j => ({ slot: 'sinir', j })).catch(e => ({ slot: 'sinir', erro: e.message })));
-      }
+    for (const slot of ['sinir', 'inea']) {
+      const nums = (document.getElementById('conc-numeros-' + slot).value || '')
+        .split(/[\s,;]+/).map(concDig).filter(Boolean);
+      if (!nums.length) continue;
+      if (!logins[slot]) { avisos.push(`Números do ${slot.toUpperCase()} informados, mas nenhum login selecionado.`); continue; }
+      const a = concAuthDe(logins[slot]);
+      if (!a.ok) { avisos.push(`Credenciais incompletas em "${a.nome}".`); continue; }
+      buscas.push(fetch(apiURL('consulta'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ numeros: nums, auth: a.auth, apiBase: a.apiBase, dialect: a.dialect }),
+      }).then(r => r.json()).then(j => ({ slot, j })).catch(e => ({ slot, erro: e.message })));
     }
     if (!buscas.length) {
       showResponse('resp-conc', '❌ Nenhum login utilizável. ' + avisos.join(' '), true);
@@ -2947,7 +2960,7 @@
       <td><input type="text" value="${e.cnpj}" placeholder="só números" maxlength="14" style="width:130px;padding:5px;border:1px solid #cbd5e0;border-radius:6px;font-size:.8rem;font-family:monospace"></td>
       <td>${sel([['gerador','Gerador'],['transportador','Transportador']], e.papel)}</td>
       <td>${sel([['direto','Direto'],['consolidador','Consolidador'],['lote','Lote']], e.padrao)}</td>
-      <td>${sel([['leopoldina','FEAM Leopoldina'],['bituruna','FEAM Bituruna'],['sinir','SINIR']], e.sistema)}</td>
+      <td>${sel([['leopoldina','FEAM Leopoldina'],['bituruna','FEAM Bituruna'],['sinir','SINIR'],['inea','INEA-RJ']], e.sistema)}</td>
       <td><button class="btn-modal-cancel" style="padding:4px 8px;color:#c0392b" onclick="this.closest('tr').remove()">✕</button></td>`;
     document.getElementById('cad-tbody').appendChild(tr);
   }
