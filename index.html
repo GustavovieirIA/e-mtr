@@ -2650,6 +2650,13 @@
     const datas = _concPesagens.map(p => p.dt).sort();
     const ini = concAddDias(datas[0], -20);                       // lote é emitido antes
     const fim = concAddDias(datas[datas.length - 1], 1);          // dataFim é exclusivo
+    // O FEAM recusa consulta com mais de 30 dias (Erro 902) — quebra em
+    // janelas de 28 e junta os resultados.
+    const janelas = [];
+    for (let a = ini; a < fim; a = concAddDias(a, 28)) {
+      const b = concAddDias(a, 28) < fim ? concAddDias(a, 28) : fim;
+      janelas.push([a, b]);
+    }
     const logins = JSON.parse(localStorage.getItem('mtr_conc_logins') || '{}');
     const avisos = [];
     const buscas = [];
@@ -2658,10 +2665,27 @@
       if (!logins[slot]) { avisos.push(`Login de ${slot} não configurado — pesagens desse aterro ficarão sem par.`); continue; }
       const a = concAuthDe(logins[slot]);
       if (!a.ok) { avisos.push(`Credenciais incompletas em "${a.nome}" — configure em ⚙ Configurações.`); continue; }
-      buscas.push(fetch(apiURL('consulta'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataInicio: ini.replace(/-/g, ''), dataFim: fim.replace(/-/g, ''), auth: a.auth, apiBase: a.apiBase, dialect: a.dialect }),
-      }).then(r => r.json()).then(j => ({ slot, j })).catch(e => ({ slot, erro: e.message })));
+      buscas.push((async () => {
+        const todos = [], msgs = [];
+        for (const [de, ate] of janelas) {
+          try {
+            const j = await fetch(apiURL('consulta'), {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dataInicio: de.replace(/-/g, ''), dataFim: ate.replace(/-/g, ''), auth: a.auth, apiBase: a.apiBase, dialect: a.dialect }),
+            }).then(r => r.json());
+            if (j?.mensagem && j.mensagem.includes('❌')) msgs.push(j.mensagem);
+            todos.push(...(j?.manifests || []));
+          } catch (e) { msgs.push('❌ ' + e.message); }
+        }
+        // as janelas não se sobrepõem, mas melhor garantir: um MTR só uma vez
+        const vistos = new Set();
+        const manifests = todos.filter(m => {
+          const n = String(m.manifestoCodigo || '');
+          if (!n || vistos.has(n)) return false;
+          vistos.add(n); return true;
+        });
+        return { slot, j: { manifests, mensagem: msgs.join(' · ') } };
+      })());
     }
     for (const slot of ['sinir', 'inea']) {
       const nums = (document.getElementById('conc-numeros-' + slot).value || '')
