@@ -1567,7 +1567,16 @@
   }
 
   function val(id)         { return document.getElementById(id).value.trim(); }
-  function numVal(id)      { const v = val(id); return v === '' ? undefined : Number(v); }
+  // Aceita decimal à brasileira ("0,24", "1.234,56"): sem isso, quantidade com
+  // vírgula virava NaN/0 e a baixa saía errada ou era rejeitada pelo órgão.
+  function numBR(v) {
+    if (typeof v === 'number') return v;
+    let s = String(v ?? '').trim();
+    if (s === '') return NaN;
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    return parseFloat(s);
+  }
+  function numVal(id)      { const n = numBR(val(id)); return Number.isNaN(n) ? undefined : n; }
   function nullableNum(id) { const v = val(id); return v === '' ? null    : Number(v); }
   function opt(v)          { return v === '' || v === null ? undefined : v; }
 
@@ -1735,7 +1744,7 @@
     if (!responsavel) { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe o Nome do Responsável.</span>'; return; }
     if (!cargo)       { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe o Cargo do Responsável.</span>'; return; }
 
-    const qtd = i => parseFloat(document.getElementById('m-qtd-' + i).value) || (m.itens[i] || {}).quantidade;
+    const qtd = i => { const n = numBR(document.getElementById('m-qtd-' + i).value); return Number.isNaN(n) || n <= 0 ? (m.itens[i] || {}).quantidade : n; };
 
     let corpo;
     if (dialetoAtivo() === 'sinir') {
