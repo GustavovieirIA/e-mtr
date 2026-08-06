@@ -1985,7 +1985,10 @@
     }
 
     const leDom = (idx, campo) => document.getElementById(`input-${idx}-${campo}`)?.value?.trim() || '';
-    const semData = grupos.filter(g => !leDom(g.idxs[0], 'dataReceb')).length;
+    // vale o primeiro valor preenchido em qualquer linha do grupo — o operador
+    // não precisa saber qual linha do MTR "conta"
+    const leGrupo = (g, campo) => g.idxs.map(idx => leDom(idx, campo)).find(Boolean) || '';
+    const semData = grupos.filter(g => !leGrupo(g, 'dataReceb')).length;
     if (semData && !confirm(`${semData} MTR(s) sem Data de Recebimento serão pulados. Continuar?`)) return;
 
     const btn = document.getElementById('btn-massa');
@@ -2005,13 +2008,13 @@
       fill.style.width = Math.round((i / grupos.length) * 100) + '%';
       label.textContent = `${i}/${grupos.length} — ✅ ${ok}  ❌ ${err}  ⏭ ${skip}`;
 
-      // dados do MTR vêm da primeira linha; quantidade e resíduo são por linha
-      const idx0 = g.idxs[0];
-      const r0   = _csvRows[idx0];
-      const dataReceb = leDom(idx0, 'dataReceb');
-      const motorista = leDom(idx0, 'motorista') || r0['Motorista'] || '';
-      const placa     = leDom(idx0, 'placa')     || r0['Placa']    || '';
-      const justif    = leDom(idx0, 'justif')    || r0['Justificativa'] || '';
+      // dados do MTR: primeiro valor preenchido em qualquer linha do grupo;
+      // quantidade e resíduo são por linha
+      const r0   = _csvRows[g.idxs[0]];
+      const dataReceb = leGrupo(g, 'dataReceb');
+      const motorista = leGrupo(g, 'motorista') || r0['Motorista'] || '';
+      const placa     = leGrupo(g, 'placa')     || r0['Placa']    || '';
+      const justif    = leGrupo(g, 'justif')    || r0['Justificativa'] || '';
 
       if (!dataReceb) { marca('status-skip', '⏭ Pulado (sem data)'); skip++; continue; }
       marca('status-wait', '⏳ Enviando…');
@@ -2294,7 +2297,7 @@
     const UNIT_MAP = { 1: 'm³', 2: 'L', 3: 'kg', 4: 't', 5: 'Un' };
 
     const headers = [
-      'Nº MTR', 'Data Emissão', 'CNPJ Gerador', 'Nome Gerador',
+      'Nº MTR', 'Item', 'Data Emissão', 'CNPJ Gerador', 'Nome Gerador',
       'CNPJ Transportador', 'Nome Transportador', 'Situação',
       'Data de recebimento', 'Motorista', 'Placa',
       'Responsável pelo recebimento', 'Cargo',
@@ -2302,40 +2305,45 @@
       'Resíduo', 'Cód. Estado Físico'
     ];
 
-    const dataRows = _ultimoResultado.map(m => {
+    // MTR com mais de um resíduo sai com uma linha por resíduo (coluna Item);
+    // a Baixa em Massa reagrupa pelo número e envia uma baixa só, completa.
+    const dataRows = _ultimoResultado.flatMap(m => {
       const cg         = m.cnpGerador        ?? '';
       const ct         = m.cnpTransportador   ?? '';
       // Sem nome resolvido, repete o CNPJ em vez de deixar a célula vazia —
       // é o que a tabela da tela faz, e uma coluna em branco não ajuda a conferir.
       const nomeGer    = m.nomeGerador       || _nomeMap[cg] || String(cg || '');
       const nomeTransp = m.nomeTransportador || _nomeMap[ct] || String(ct || '');
-      const fi         = (m.itens || [])[0]  || {};
       const motorista  = (m.nomeMotorista?.trim()) || 'Claudio';
-      // SINIR manda a sigla (TON, KG…) — os códigos do SINIR são diferentes do FEAM,
-      // então NUNCA usar UNIT_MAP no SINIR (cód. 3 = Tonelada no SINIR, mas kg no FEAM).
-      const unidade    = fi.unidadeSigla
-        || (dialetoAtivo() === 'sinir' ? '' : (UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '')));
-      return [
-        m.manifestoCodigo ?? '',
-        formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
-        cg ? String(cg) : '',
-        nomeGer,
-        ct ? String(ct) : '',
-        nomeTransp,
-        m.situacao ?? 'Emitido (aguarda baixa)',
-        '',                         // Data de recebimento — operador preenche
-        motorista,
-        m.placaVeiculo ?? '',
-        'Victoria Abrahão',
-        'Analista ambiental',
-        fi.quantidade       ?? '',  // Qt. Indicada — sistema
-        '',                         // Qt. Recebida  — operador preenche
-        unidade,
-        fi.codigoTecnologia ?? '',
-        'Peso apurado em balança',
-        fi.residuo          ?? '',
-        fi.codigoTipoEstado ?? ''
-      ];
+      const itens      = (m.itens || []).length ? m.itens : [{}];
+      return itens.map((fi, k) => {
+        // SINIR manda a sigla (TON, KG…) — os códigos do SINIR são diferentes do FEAM,
+        // então NUNCA usar UNIT_MAP no SINIR (cód. 3 = Tonelada no SINIR, mas kg no FEAM).
+        const unidade = fi.unidadeSigla
+          || (dialetoAtivo() === 'sinir' ? '' : (UNIT_MAP[fi.codigoUnidade] || (fi.codigoUnidade != null ? String(fi.codigoUnidade) : '')));
+        return [
+          m.manifestoCodigo ?? '',
+          fi.codigoSequencial ?? k + 1,
+          formatDate(m.manifDataExpedicao ?? m.dataExpedicao ?? m.dataEmissao),
+          cg ? String(cg) : '',
+          nomeGer,
+          ct ? String(ct) : '',
+          nomeTransp,
+          m.situacao ?? 'Emitido (aguarda baixa)',
+          '',                         // Data de recebimento — operador preenche
+          motorista,
+          m.placaVeiculo ?? '',
+          'Victoria Abrahão',
+          'Analista ambiental',
+          fi.quantidade       ?? '',  // Qt. Indicada — sistema
+          '',                         // Qt. Recebida  — operador preenche
+          unidade,
+          fi.codigoTecnologia ?? '',
+          'Peso apurado em balança',
+          fi.residuo          ?? '',
+          fi.codigoTipoEstado ?? ''
+        ];
+      });
     });
 
     const aoa = [headers, ...dataRows];
@@ -2343,7 +2351,7 @@
 
     // Larguras aproximadas por coluna
     ws['!cols'] = [
-      {wch:14},{wch:12},{wch:16},{wch:30},
+      {wch:14},{wch:5},{wch:12},{wch:16},{wch:30},
       {wch:16},{wch:30},{wch:24},
       {wch:18},{wch:16},{wch:10},
       {wch:22},{wch:20},
