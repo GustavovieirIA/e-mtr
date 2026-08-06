@@ -1973,11 +1973,20 @@
     const rows = _csvRows.filter(r => _getMTR(r));
     if (!rows.length) return;
 
-    const rowIdxs = rows.map(r => _csvRows.indexOf(r));
-    const semData = rowIdxs.filter(i =>
-      !(document.getElementById(`input-${i}-dataReceb`)?.value?.trim())
-    ).length;
-    if (semData && !confirm(`${semData} linha(s) sem Data de Recebimento serão puladas. Continuar?`)) return;
+    // MTR com mais de um resíduo ocupa uma linha por resíduo na planilha —
+    // agrupa pelo número para mandar UMA baixa com todos os itens (o órgão
+    // não aceita recebimento parcial).
+    const grupos = [];
+    const porMtr = new Map();
+    for (const r of rows) {
+      const num = _getMTR(r);
+      if (!porMtr.has(num)) { const g = { mtr: num, idxs: [] }; porMtr.set(num, g); grupos.push(g); }
+      porMtr.get(num).idxs.push(_csvRows.indexOf(r));
+    }
+
+    const leDom = (idx, campo) => document.getElementById(`input-${idx}-${campo}`)?.value?.trim() || '';
+    const semData = grupos.filter(g => !leDom(g.idxs[0], 'dataReceb')).length;
+    if (semData && !confirm(`${semData} MTR(s) sem Data de Recebimento serão pulados. Continuar?`)) return;
 
     const btn = document.getElementById('btn-massa');
     btn.disabled = true; btn.textContent = 'Processando…';
@@ -1987,58 +1996,74 @@
 
     let ok = 0, err = 0, skip = 0;
 
-    for (let i = 0; i < rows.length; i++) {
-      const r      = rows[i];
-      const idx    = _csvRows.indexOf(r);
-      const statusEl = document.getElementById(`massa-status-${idx}`);
-      fill.style.width = Math.round((i / rows.length) * 100) + '%';
-      label.textContent = `${i}/${rows.length} — ✅ ${ok}  ❌ ${err}  ⏭ ${skip}`;
+    for (let i = 0; i < grupos.length; i++) {
+      const g = grupos[i];
+      const marca = (cls, txt) => g.idxs.forEach(idx => {
+        const el = document.getElementById(`massa-status-${idx}`);
+        if (el) { el.className = cls; el.textContent = txt; }
+      });
+      fill.style.width = Math.round((i / grupos.length) * 100) + '%';
+      label.textContent = `${i}/${grupos.length} — ✅ ${ok}  ❌ ${err}  ⏭ ${skip}`;
 
-      // lê valores do DOM (editados pelo operador têm precedência)
-      const dataReceb = document.getElementById(`input-${idx}-dataReceb`)?.value?.trim() || '';
-      const motorista = document.getElementById(`input-${idx}-motorista`)?.value?.trim() || r['Motorista'] || '';
-      const placa     = document.getElementById(`input-${idx}-placa`)?.value?.trim()     || r['Placa']    || '';
-      const qtReceb   = document.getElementById(`input-${idx}-qtReceb`)?.value?.trim()   || r['Qt. Indicada'] || '';
-      const justif    = document.getElementById(`input-${idx}-justif`)?.value?.trim()    || r['Justificativa'] || '';
-      const residuo   = document.getElementById(`input-${idx}-residuo`)?.value?.trim()   || r['Resíduo'] || r['Residuo'] || '';
+      // dados do MTR vêm da primeira linha; quantidade e resíduo são por linha
+      const idx0 = g.idxs[0];
+      const r0   = _csvRows[idx0];
+      const dataReceb = leDom(idx0, 'dataReceb');
+      const motorista = leDom(idx0, 'motorista') || r0['Motorista'] || '';
+      const placa     = leDom(idx0, 'placa')     || r0['Placa']    || '';
+      const justif    = leDom(idx0, 'justif')    || r0['Justificativa'] || '';
 
-      if (!dataReceb) {
-        if (statusEl) { statusEl.className = 'status-skip'; statusEl.textContent = '⏭ Pulado (sem data)'; }
-        skip++; continue;
-      }
+      if (!dataReceb) { marca('status-skip', '⏭ Pulado (sem data)'); skip++; continue; }
+      marca('status-wait', '⏳ Enviando…');
 
-      if (statusEl) { statusEl.className = 'status-wait'; statusEl.textContent = '⏳ Enviando…'; }
+      const itens = g.idxs.map((idx, k) => {
+        const r = _csvRows[idx];
+        return {
+          seq:     parseInt(r['Item']) || k + 1,
+          qt:      leDom(idx, 'qtReceb') || r['Qt. Indicada'] || '',
+          residuo: leDom(idx, 'residuo') || r['Resíduo'] || r['Residuo'] || '',
+          tec:     r['Tecnologia'] || '',
+          est:     r['Cód. Estado Físico'] || '',
+        };
+      });
 
       let payload;
       if (dialetoAtivo() === 'sinir') {
         // SINIR: /api/baixa consulta o MTR e pega os códigos sozinho.
-        // Mandamos só número + quantidade recebida + data + dados do recebimento.
         payload = {
-          manNumero:                  _getMTR(r),
+          manNumero:                  g.mtr,
           dataRecebimento:            _csvDateToAPI(dataReceb),   // AAAAMMDD; a função converte p/ epoch
-          qtdRecebida:                qtReceb,
           nomeMotorista:              motorista,
           placaVeiculo:               placa,
-          nomeResponsavelRecebimento: r['Responsável pelo recebimento'] || 'Victoria Abrahão',
+          nomeResponsavelRecebimento: r0['Responsável pelo recebimento'] || 'Victoria Abrahão',
           observacoes:                justif,
           justificativa:              justif
         };
+        if (itens.length === 1) payload.qtdRecebida = itens[0].qt;
+        else payload.itens = itens.map(it => ({ marQuantidadeRecebida: it.qt }));
       } else {
         payload = {
-          'Número do Manifesto (10 dígitos)':     _getMTR(r),
-          'CNPJ do Gerador':                       _normalizeCNPJ(r['CNPJ Gerador']),
-          'CNPJ do Transportador':                 _normalizeCNPJ(r['CNPJ Transportador']),
-          'Nome do Responsável pelo Recebimento':  r['Responsável pelo recebimento']   || 'Victoria Abrahão',
-          'Cargo do Responsável':                  r['Cargo']                          || 'Analista ambiental',
+          'Número do Manifesto (10 dígitos)':     g.mtr,
+          'CNPJ do Gerador':                       _normalizeCNPJ(r0['CNPJ Gerador']),
+          'CNPJ do Transportador':                 _normalizeCNPJ(r0['CNPJ Transportador']),
+          'Nome do Responsável pelo Recebimento':  r0['Responsável pelo recebimento']   || 'Victoria Abrahão',
+          'Cargo do Responsável':                  r0['Cargo']                          || 'Analista ambiental',
           'Data de Recebimento (AAAAMMDD)':        _csvDateToAPI(dataReceb),
           'Observações do Recebimento':            justif,
           'Nome do Motorista':                     motorista,
           'Placa do Veículo':                      placa,
-          'Quantidade Recebida':                   qtReceb,
-          'Código do Resíduo (IBAMA)':             String(residuo),
-          'Código de Tecnologia':                  r['Tecnologia']                     || '',
-          'Código de Estado Físico':               r['Cód. Estado Físico']             || ''
         };
+        if (itens.length === 1) {
+          payload['Quantidade Recebida']       = itens[0].qt;
+          payload['Código do Resíduo (IBAMA)'] = String(itens[0].residuo);
+          payload['Código de Tecnologia']      = itens[0].tec;
+          payload['Código de Estado Físico']   = itens[0].est;
+        } else {
+          payload.itens = itens.map(it => ({
+            codigoSequencial: it.seq, qtdRecebida: it.qt, residuo: String(it.residuo),
+            codigoTecnologia: it.tec, codigoTipoEstado: it.est,
+          }));
+        }
       }
 
       try {
@@ -2052,13 +2077,10 @@
         const msg  = typeof body === 'string' ? body.trim() : (body.mensagem || JSON.stringify(body));
         const isOk   = !msg.includes('❌');
         const errMsg = msg.replace(/^[❌\s]+/, '').slice(0, 80);
-        if (statusEl) {
-          statusEl.className   = isOk ? 'status-ok' : 'status-err';
-          statusEl.textContent = isOk ? '✅ OK' : `❌ ${errMsg}`;
-        }
+        marca(isOk ? 'status-ok' : 'status-err', isOk ? '✅ OK' : `❌ ${errMsg}`);
         if (isOk) ok++; else err++;
       } catch(e) {
-        if (statusEl) { statusEl.className = 'status-err'; statusEl.textContent = `❌ ${e.message}`; }
+        marca('status-err', `❌ ${e.message}`);
         err++;
       }
     }
@@ -2944,6 +2966,34 @@
     const dtBR = iso => iso ? iso.split('-').reverse().join('/') : '';
     const linhas = [];   // { sistema, row }
 
+    // MTR com mais de um resíduo sai com UMA LINHA POR RESÍDUO (a Baixa em
+    // Massa reagrupa pelo número); a fatia de cada item vai na unidade dele.
+    const sigla = it => {
+      const s = concNorm(it.unidadeSigla || '');
+      if (s) return /^T/.test(s) ? 't' : (/KG/.test(s) ? 'kg' : s.toLowerCase());
+      const u = Number(it.codigoUnidade);
+      return u === 4 ? 't' : u === 3 ? 'kg' : (it.codigoUnidade ?? '');
+    };
+    const naUnidade = (it, valorT) =>
+      sigla(it) === 't' ? +valorT.toFixed(3) : sigla(it) === 'kg' ? +(valorT * 1000).toFixed(1) : '';
+
+    const linhasDoMtr = (m, base, fatiaT) => {
+      const itens = (m.raw.itens || []).length ? m.raw.itens : [{}];
+      const totalRaw = itens.reduce((s, it) => s + (Number(it.quantidade) || 0), 0);
+      return itens.map((it, k) => {
+        const fatiaItemT = fatiaT == null ? null
+          : totalRaw > 0 ? fatiaT * ((Number(it.quantidade) || 0) / totalRaw) : fatiaT / itens.length;
+        return { ...base,
+          'Item': it.codigoSequencial ?? k + 1,
+          'Qt. Indicada': it.quantidade ?? '',
+          'Qt. Recebida': fatiaItemT == null ? '' : naUnidade(it, fatiaItemT),
+          'Unidade': sigla(it) || 't',
+          'Tecnologia': it.codigoTecnologia ?? '',
+          'Resíduo': it.residuo ?? '', 'Cód. Estado Físico': it.codigoTipoEstado ?? '',
+        };
+      });
+    };
+
     for (const x of r.propostas) {
       const aprovada = x.cor !== 'vermelha';
       const status = x.cor === 'verde' ? `✓ fecha (${(x.dif*100).toFixed(1)}%)`
@@ -2952,8 +3002,7 @@
       for (const m of x.mtrs) {
         const fatiaT = x.mtrs.length === 1 ? x.p.t
           : (x.soma > 0 ? x.p.t * ((m.t ?? 0) / x.soma) : x.p.t / x.mtrs.length);
-        const fi = (m.raw.itens || [])[0] || {};
-        linhas.push({ sistema: x.p.sistema, row: {
+        const base = {
           'Nº MTR': m.num,
           'Data Emissão': dtBR(m.dt),
           'CNPJ Gerador': m.cnpjGer, 'Nome Gerador': m.raw.nomeGerador || _nomeMap[m.cnpjGer] || '',
@@ -2963,30 +3012,26 @@
           'Motorista': m.raw.nomeMotorista || '',
           'Placa': m.raw.placaVeiculo || x.p.placa || '',
           'Responsável pelo recebimento': 'Victoria Abrahão', 'Cargo': 'Analista ambiental',
-          'Qt. Indicada': m.t ?? '', 'Qt. Recebida': +fatiaT.toFixed(3),
-          'Unidade': 't', 'Tecnologia': fi.codigoTecnologia ?? '',
           'Justificativa': 'Peso apurado em balança',
-          'Resíduo': fi.residuo ?? '', 'Cód. Estado Físico': fi.codigoTipoEstado ?? '',
           'Nº Pesagem': x.p.n, 'Data Pesagem': dtBR(x.p.dt), 'Peso Balança (t)': +x.p.t.toFixed(3),
           'Gerador na balança': x.p.gerLabel, 'Conciliação': status,
-        }});
+        };
+        for (const row of linhasDoMtr(m, base, fatiaT)) linhas.push({ sistema: x.p.sistema, row });
       }
     }
     for (const m of r.sobra) {
-      const fi = (m.raw.itens || [])[0] || {};
-      linhas.push({ sistema: m.sistema, row: {
+      const base = {
         'Nº MTR': m.num, 'Data Emissão': dtBR(m.dt),
         'CNPJ Gerador': m.cnpjGer, 'Nome Gerador': m.raw.nomeGerador || _nomeMap[m.cnpjGer] || '',
         'CNPJ Transportador': m.cnpjTransp, 'Nome Transportador': m.raw.nomeTransportador || _nomeMap[m.cnpjTransp] || '',
         'Situação': m.situacao || 'Emitido (aguarda baixa)',
         'Data de recebimento': '', 'Motorista': m.raw.nomeMotorista || '', 'Placa': m.raw.placaVeiculo || '',
         'Responsável pelo recebimento': 'Victoria Abrahão', 'Cargo': 'Analista ambiental',
-        'Qt. Indicada': m.t ?? '', 'Qt. Recebida': '', 'Unidade': 't',
-        'Tecnologia': fi.codigoTecnologia ?? '', 'Justificativa': 'Peso apurado em balança',
-        'Resíduo': fi.residuo ?? '', 'Cód. Estado Físico': fi.codigoTipoEstado ?? '',
+        'Justificativa': 'Peso apurado em balança',
         'Nº Pesagem': '', 'Data Pesagem': '', 'Peso Balança (t)': '',
         'Gerador na balança': '', 'Conciliação': '✗ sem pesagem na balança — preencha a data para baixar mesmo assim',
-      }});
+      };
+      for (const row of linhasDoMtr(m, base, null)) linhas.push({ sistema: m.sistema, row });
     }
 
     const sistemas = [...new Set(linhas.map(l => l.sistema))];
