@@ -296,6 +296,7 @@
     .results-table tr.linha-bloqueada td { background: var(--soft2); color: var(--mut2); }
     .results-table tr.linha-bloqueada td strong { color: var(--mut); }
     .results-table tr.linha-bloqueada td.status-err { color: #DC2626; }
+    .mtr-login { font-size: .68rem; font-weight: 600; color: var(--mut); white-space: nowrap; margin-top: 1px; }
     .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .72rem; font-weight: 600; }
     .badge-open   { background: var(--amber-soft); color: var(--amber-ink); }
     .badge-done   { background: var(--ok-bg);  color: var(--ok); }
@@ -675,8 +676,9 @@
         </div>
         <p class="ajuda">
           Suba a planilha de pesagens com as colunas <strong>n° do MTR, Peso líquido (kg), Placa do cavalo,
-          Motorista e Data da pesagem</strong>. O sistema busca cada MTR no órgão pelo login
-          <strong id="bn-login-nome">—</strong>, completa os dados e deixa pronto para baixar com o peso da balança.
+          Motorista e Data da pesagem</strong> (sem motorista, vai "Junior"). O sistema procura cada MTR em
+          todos os logins configurados (<strong id="bn-login-nome">—</strong>), completa os dados e deixa
+          pronto para baixar com o peso da balança, cada um pelo login onde foi encontrado.
           Também aceita a planilha exportada em Consultar MTRs ou em Baixa s/ número.
         </p>
 
@@ -1898,11 +1900,17 @@
   // entradas: um motor de baixa só.
   //
   // Travas (linha bloqueada não é enviada, e não dá para destravar na tela):
-  // número inválido ou repetido, peso ou data inválidos, MTR não encontrado no
-  // login ativo, MTR que não está "emitido" (recebido, cancelado, armazenamento
+  // número inválido ou repetido, peso ou data inválidos, MTR não encontrado em
+  // nenhum login, MTR que não está "emitido" (recebido, cancelado, armazenamento
   // temporário) e unidade que não é kg nem t.
+  //
+  // A busca passa por todos os logins com credenciais completas (o ativo
+  // primeiro) e cada MTR fica com o login onde apareceu: é por ele que a baixa
+  // sai. A operadora não precisa saber em qual sistema está cada número.
   let _bnModo = false;         // true quando a prévia veio da planilha de pesagens
   const BN_LOTE = 30;          // números por chamada de consulta
+  // Motorista quando nem a planilha nem o MTR trazem o nome (regra da operação, 2026-11-23).
+  const MOTORISTA_PADRAO = 'Junior';
 
   const bnCanon = v => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -2004,14 +2012,14 @@
       'Nome Transportador': m ? (m.nomeTransportador || _nomeMap[ct] || ct) : '',
       'Situação': m ? String(m.situacao || '') : '',
       'Data de recebimento': bnDtBR(l.dt),
-      'Motorista': l.motorista || (m && m.nomeMotorista) || '',
+      'Motorista': l.motorista || (m && m.nomeMotorista) || MOTORISTA_PADRAO,
       'Placa': l.placa || (m && m.placaVeiculo) || '',
       'Responsável pelo recebimento': 'Victoria Abrahão',
       'Cargo': 'Analista ambiental',
       'Qt. Indicada': '', 'Qt. Recebida': '', 'Unidade': '', 'Tecnologia': '',
       'Justificativa': 'Peso apurado em balança',
       'Resíduo': '', 'Cód. Estado Físico': '',
-      _linha: l.linha, _pesoKg: l.kg, _bloqueio: '', _aviso: '',
+      _linha: l.linha, _pesoKg: l.kg, _bloqueio: '', _aviso: '', _perfil: '', _login: '',
     };
   }
   const bnBloqueada = (l, motivo, m) => ({ ...bnLinhaBase(l, m), _bloqueio: motivo });
@@ -2055,58 +2063,90 @@
     });
   }
 
+  // Logins com credenciais completas, o ativo primeiro.
+  function bnLogins() {
+    const ativo = sistemaAtivo();
+    return getPerfis().map(p => ({ id: p.id, ...concAuthDe(p.id) })).filter(a => a.ok)
+      .sort((a, b) => (b.id === ativo) - (a.id === ativo));
+  }
+  // O MTR é deste login? Compara o destinador com o CNPJ do login, quando os
+  // dois são CNPJ. Sem como comparar, vale como "sim".
+  function bnDestinoBate(m, a) {
+    const dest  = concDig(m.cnpDestinador);
+    const login = concDig(a.dialect === 'sinir' ? a.auth.cpfCnpj : a.auth.pessoaCnpj);
+    return dest.length !== 14 || login.length !== 14 || dest === login;
+  }
+
   async function bnImportar(linhas) {
     if (!linhas.length) { showResponse('resp-massa', '❌ Nenhuma pesagem encontrada na planilha.', true); return; }
-    if (!_camposObrigatorios().every(k => _cred()[k])) {
-      showResponse('resp-massa', `❌ Configure o acesso de ${perfilAtivo().nome} em Configurações antes de subir a planilha.`, true);
+    const logins = bnLogins();
+    if (!logins.length) {
+      showResponse('resp-massa', '❌ Nenhum login configurado. Preencha o acesso em Configurações antes de subir a planilha.', true);
       return;
     }
     const nums = linhas.filter(l => !l.erro).map(l => l.num);
-    const achados = new Map(), semResposta = new Set();
+    // achados: número → { m, a, certo }. "certo" = o destinador bate com o login.
+    const achados = new Map(), semResposta = new Map(), falhas = [];
     const wrap  = document.getElementById('massa-progress-wrap');
     const fill  = document.getElementById('massa-progress-fill');
     const label = document.getElementById('massa-progress-label');
     document.getElementById('massa-preview').style.display = 'none';
     wrap.style.display = 'block';
 
-    for (let i = 0; i < nums.length; i += BN_LOTE) {
-      fill.style.width = Math.round((i / nums.length) * 100) + '%';
-      label.textContent = `Buscando os MTRs em ${perfilAtivo().nome}… ${i}/${nums.length}`;
-      const lote = nums.slice(i, i + BN_LOTE);
-      try {
-        const j = await fetch(apiURL('consulta'), {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ numeros: lote, ...getAuthPayload() }),
-        }).then(r => r.json());
-        // sem a lista de não encontrados, a consulta nem chegou a rodar (login, senha, API fora)
-        if (!j.sucesso && !Array.isArray(j.naoEncontrados)) {
-          wrap.style.display = 'none';
-          showResponse('resp-massa', j.mensagem || '❌ A consulta ao órgão falhou.', true);
-          return;
+    for (let k = 0; k < logins.length; k++) {
+      const a = logins[k];
+      // só o que ainda não apareceu (ou apareceu num login que não é o destinador)
+      const faltam = nums.filter(n => !achados.get(n)?.certo);
+      if (!faltam.length) break;
+      for (let i = 0; i < faltam.length; i += BN_LOTE) {
+        fill.style.width = Math.round(((k + i / faltam.length) / logins.length) * 100) + '%';
+        label.textContent = `Procurando em ${a.nome}… ${i}/${faltam.length}`;
+        const lote = faltam.slice(i, i + BN_LOTE);
+        const semResp = n => { if (!semResposta.has(n)) semResposta.set(n, a.nome); };
+        try {
+          const j = await fetch(apiURL('consulta'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ numeros: lote, auth: a.auth, apiBase: a.apiBase, dialect: a.dialect }),
+          }).then(r => r.json());
+          // sem a lista de não encontrados, a consulta nem chegou a rodar neste
+          // login (senha, API fora): anota e segue para o próximo login
+          if (!j.sucesso && !Array.isArray(j.naoEncontrados)) {
+            falhas.push(`${a.nome}: ${String(j.mensagem || 'a consulta falhou').replace(/^[❌\s]+/, '')}`);
+            break;
+          }
+          for (const m of (j.manifests || [])) {
+            const n = concDig(m.manifestoCodigo), certo = bnDestinoBate(m, a);
+            if (!achados.has(n) || certo) achados.set(n, { m, a, certo });
+          }
+          for (const n of (j.semResposta || [])) semResp(String(n));
+        } catch (e) {
+          lote.forEach(semResp);                       // rede ou tempo esgotado: só este lote
         }
-        for (const m of (j.manifests || [])) achados.set(concDig(m.manifestoCodigo), m);
-        for (const n of (j.semResposta || [])) semResposta.add(String(n));
-      } catch (e) {
-        lote.forEach(n => semResposta.add(n));       // rede ou tempo esgotado: só este lote
       }
     }
     wrap.style.display = 'none';
 
-    const dialeto = dialetoAtivo();
+    const ondeProcurou = logins.map(a => a.nome).join(', ');
     _csvRows = [];
     for (const l of linhas) {
       if (l.erro) { _csvRows.push(bnBloqueada(l, l.erro)); continue; }
-      const m = achados.get(l.num);
-      if (!m) {
+      const achado = achados.get(l.num);
+      if (!achado) {
         _csvRows.push(bnBloqueada(l, semResposta.has(l.num)
-          ? 'O órgão não respondeu: suba a planilha de novo'
-          : `Não encontrado em ${perfilAtivo().nome}`));
+          ? `${semResposta.get(l.num)} não respondeu: suba a planilha de novo`
+          : `Não encontrado em nenhum login (${ondeProcurou})`));
         continue;
       }
-      _csvRows.push(...bnLinhasDoMtr(l, m, dialeto));
+      const novas = bnLinhasDoMtr(l, achado.m, achado.a.dialect);
+      novas.forEach(r => { r._perfil = achado.a.id; r._login = achado.a.nome; });
+      _csvRows.push(...novas);
     }
     _bnModo = true;
     _renderCSVPreview();
+    if (falhas.length) {
+      showResponse('resp-massa', '❌ Login que não consultou: ' + falhas.join(' · ')
+        + '. Os MTRs dele aparecem como não encontrados.', true);
+    }
 
     // nomes de gerador e transportador chegam depois, sem redesenhar a tabela
     // (redesenhar apagaria o que o operador já tiver corrigido nas células)
@@ -2125,7 +2165,7 @@
 
   function bnAtualizaLogin() {
     const el = document.getElementById('bn-login-nome');
-    if (el) el.textContent = perfilAtivo().nome;
+    if (el) el.textContent = bnLogins().map(a => a.nome).join(', ') || 'nenhum ainda';
   }
   function bnPassos(n) {
     document.querySelectorAll('#bn-passos .passo').forEach(el =>
@@ -2145,7 +2185,7 @@
                        : r._aviso ? `<td class="status-skip" id="massa-status-${i}">${esc(r._aviso)}</td>`
                        : `<td class="status-wait" id="massa-status-${i}">—</td>`;
       return `<tr id="massa-row-${i}"${bloq ? ' class="linha-bloqueada"' : ''}>
-        <td><strong>${esc(_getMTR(r)) || '—'}</strong></td>
+        <td><strong>${esc(_getMTR(r)) || '—'}</strong>${r._login ? `<div class="mtr-login">${esc(r._login)}</div>` : ''}</td>
         ${status}
         <td style="font-size:.78rem;white-space:nowrap">${esc(r['Data Emissão']) || '—'}</td>
         <td id="massa-ger-${i}" style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeGer)}">${esc(nomeGer)}</td>
@@ -2185,7 +2225,9 @@
     }
     document.getElementById('massa-chips').innerHTML = chips.join('');
     document.getElementById('massa-count').textContent =
-      `${_csvRows.length} linha(s) · baixa pelo login ${perfilAtivo().nome}`;
+      `${_csvRows.length} linha(s) · ` + (_bnModo
+        ? 'cada MTR sai pelo login onde foi encontrado'
+        : `baixa pelo login ${perfilAtivo().nome}`);
     document.getElementById('massa-preview').style.display = 'block';
     document.getElementById('massa-progress-wrap').style.display = 'none';
     document.getElementById('btn-massa').disabled = !livres.length;
@@ -2228,7 +2270,17 @@
     const aEnviar = grupos.length - semData;
     if (!aEnviar) { alert('Nenhum MTR com Data de Recebimento preenchida.'); return; }
     // A baixa é feita no órgão e este sistema não desfaz: confirma sempre.
-    if (!confirm(`Dar baixa em ${aEnviar} MTR(s) pelo login "${perfilAtivo().nome}"?`
+    // linha vinda da busca traz o login onde o MTR foi encontrado; as outras
+    // entradas (planilha exportada, .csv) seguem pelo login ativo
+    const loginDe = r => r._perfil ? concAuthDe(r._perfil) : { ...getAuthPayload(), nome: perfilAtivo().nome };
+    const porLogin = {};
+    for (const g of grupos) {
+      if (!leGrupo(g, 'dataReceb')) continue;
+      const nome = loginDe(_csvRows[g.idxs[0]]).nome;
+      porLogin[nome] = (porLogin[nome] || 0) + 1;
+    }
+    const resumoLogins = Object.entries(porLogin).map(([nome, n]) => `${nome}: ${n}`).join('\n');
+    if (!confirm(`Dar baixa em ${aEnviar} MTR(s)?\n\n${resumoLogins}`
         + (semData ? `\n${semData} sem Data de Recebimento serão pulados.` : '')
         + '\n\nA baixa é registrada no órgão e não pode ser desfeita por aqui.')) return;
 
@@ -2253,7 +2305,7 @@
       // quantidade e resíduo são por linha
       const r0   = _csvRows[g.idxs[0]];
       const dataReceb = leGrupo(g, 'dataReceb');
-      const motorista = leGrupo(g, 'motorista') || r0['Motorista'] || '';
+      const motorista = leGrupo(g, 'motorista') || r0['Motorista'] || MOTORISTA_PADRAO;
       const placa     = leGrupo(g, 'placa')     || r0['Placa']    || '';
       const justif    = leGrupo(g, 'justif')    || r0['Justificativa'] || '';
 
@@ -2271,8 +2323,9 @@
         };
       });
 
+      const login = loginDe(r0);
       let payload;
-      if (dialetoAtivo() === 'sinir') {
+      if (login.dialect === 'sinir') {
         // SINIR: /api/baixa consulta o MTR e pega os códigos sozinho.
         payload = {
           manNumero:                  g.mtr,
@@ -2314,7 +2367,7 @@
         const res  = await fetch(apiURL('baixa'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...payload, ...getAuthPayload() })
+          body: JSON.stringify({ ...payload, auth: login.auth, apiBase: login.apiBase, dialect: login.dialect })
         });
         const ct   = res.headers.get('content-type') || '';
         const body = ct.includes('json') ? await res.json() : await res.text();
@@ -2556,7 +2609,7 @@
       // é o que a tabela da tela faz, e uma coluna em branco não ajuda a conferir.
       const nomeGer    = m.nomeGerador       || _nomeMap[cg] || String(cg || '');
       const nomeTransp = m.nomeTransportador || _nomeMap[ct] || String(ct || '');
-      const motorista  = (m.nomeMotorista?.trim()) || 'Claudio';
+      const motorista  = (m.nomeMotorista?.trim()) || MOTORISTA_PADRAO;
       const itens      = (m.itens || []).length ? m.itens : [{}];
       return itens.map((fi, k) => {
         // SINIR manda a sigla (TON, KG…) — os códigos do SINIR são diferentes do FEAM,
@@ -3293,7 +3346,7 @@
           'CNPJ Transportador': m.cnpjTransp, 'Nome Transportador': m.raw.nomeTransportador || _nomeMap[m.cnpjTransp] || '',
           'Situação': m.situacao || 'Emitido (aguarda baixa)',
           'Data de recebimento': aprovada ? dtBR(x.p.dt) : '',
-          'Motorista': m.raw.nomeMotorista || '',
+          'Motorista': m.raw.nomeMotorista || MOTORISTA_PADRAO,
           'Placa': m.raw.placaVeiculo || x.p.placa || '',
           'Responsável pelo recebimento': 'Victoria Abrahão', 'Cargo': 'Analista ambiental',
           'Justificativa': 'Peso apurado em balança',
@@ -3309,7 +3362,7 @@
         'CNPJ Gerador': m.cnpjGer, 'Nome Gerador': m.raw.nomeGerador || _nomeMap[m.cnpjGer] || '',
         'CNPJ Transportador': m.cnpjTransp, 'Nome Transportador': m.raw.nomeTransportador || _nomeMap[m.cnpjTransp] || '',
         'Situação': m.situacao || 'Emitido (aguarda baixa)',
-        'Data de recebimento': '', 'Motorista': m.raw.nomeMotorista || '', 'Placa': m.raw.placaVeiculo || '',
+        'Data de recebimento': '', 'Motorista': m.raw.nomeMotorista || MOTORISTA_PADRAO, 'Placa': m.raw.placaVeiculo || '',
         'Responsável pelo recebimento': 'Victoria Abrahão', 'Cargo': 'Analista ambiental',
         'Justificativa': 'Peso apurado em balança',
         'Nº Pesagem': '', 'Data Pesagem': '', 'Peso Balança (t)': '',
@@ -3369,7 +3422,7 @@
       if (lista.some(v => v == null)) return null;
       return {
         manNumero: m.num, dataRecebimento: dataAAAAMMDD,
-        nomeMotorista: m.raw.nomeMotorista || '', placaVeiculo: m.raw.placaVeiculo || pesagem.placa || '',
+        nomeMotorista: m.raw.nomeMotorista || MOTORISTA_PADRAO, placaVeiculo: m.raw.placaVeiculo || pesagem.placa || '',
         nomeResponsavelRecebimento: 'Victoria Abrahão',
         observacoes: '', justificativa: 'Peso apurado em balança',
         itens: lista,
@@ -3391,7 +3444,7 @@
       'Cargo do Responsável': 'Analista ambiental',
       'Data de Recebimento (AAAAMMDD)': dataAAAAMMDD,
       'Observações do Recebimento': 'Peso apurado em balança',
-      'Nome do Motorista': m.raw.nomeMotorista || '',
+      'Nome do Motorista': m.raw.nomeMotorista || MOTORISTA_PADRAO,
       'Placa do Veículo': m.raw.placaVeiculo || pesagem.placa || '',
       itens: lista,
       auth: auth.auth, apiBase: auth.apiBase, dialect: auth.dialect,

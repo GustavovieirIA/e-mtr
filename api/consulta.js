@@ -163,7 +163,7 @@ function numeroDoBarcode(barcode) {
 // ── API nova (SINIR / INEA): busca por número ────────────────────────────────
 
 async function consultaSinir(apiBase, form) {
-  const numeros = (form.numeros || []).map(soDigitos).filter(Boolean);
+  const numeros = [...new Set((form.numeros || []).map(soDigitos).filter(Boolean))];
   if (!numeros.length) return vazio('❌ Nenhum número de MTR informado.');
 
   const token = await getTokenSinir(apiBase, form.auth || {});
@@ -171,26 +171,29 @@ async function consultaSinir(apiBase, form) {
 
   const respostas = await emLotes(numeros, LOTE, num =>
     apiFetch(`${apiBase}/retornaManifesto/${encodeURIComponent(num)}`, { method: 'GET', headers })
+      .catch(() => SEM_RESPOSTA)      // um número sem resposta não derruba os outros
   );
 
-  const manifests = [], naoEncontrados = [];
+  const manifests = [], naoEncontrados = [], semResposta = [];
   let falhas = 0;
   respostas.forEach((resposta, i) => {
+    if (resposta === SEM_RESPOSTA) { semResposta.push(numeros[i]); return; }
     const m = resposta?.objetoResposta;
     if (!m || !m.manNumero) { falhas++; naoEncontrados.push(numeros[i]); return; }
     manifests.push(normalizaManifestoSinir(m));
   });
 
   if (!manifests.length) {
-    return { ...vazio(`❌ Nenhum MTR encontrado (${falhas} número(s) não retornaram dados). Confira os números.`), naoEncontrados };
+    return { ...vazio(`❌ Nenhum MTR encontrado (${falhas + semResposta.length} número(s) não retornaram dados). Confira os números.`), naoEncontrados, semResposta };
   }
 
   return {
     sucesso: true,
     total: manifests.length,
     totalPendentes: manifests.length,
-    manifests, naoEncontrados,
-    mensagem: `✅ ${manifests.length} MTR(s) carregado(s)` + (falhas ? ` — ${falhas} não encontrado(s)` : ''),
+    manifests, naoEncontrados, semResposta,
+    mensagem: `✅ ${manifests.length} MTR(s) carregado(s)` + (falhas ? ` — ${falhas} não encontrado(s)` : '')
+      + (semResposta.length ? ` — ${semResposta.length} sem resposta do órgão` : ''),
   };
 }
 
