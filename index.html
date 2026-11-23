@@ -3,192 +3,203 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>E-MTR · União Recicláveis</title>
-  <link rel="icon" type="image/png" href="logo-uniao.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+  <meta name="theme-color" content="#F5C800" />
+  <title>Inteligência MTR</title>
+  <link rel="icon" type="image/png" href="icone-iep.png" />
+  <link rel="apple-touch-icon" href="icone-iep.png" />
   <style>
+    /* Visual no padrão do portal da Inteligência em Pesados:
+       fundo claro, menu grafite, destaque âmbar com texto escuro. */
+    :root {
+      --bg: #F8F8F7; --card: #FFFFFF; --dark: #1A1A1A;
+      --ink: #111111; --ink2: #374151; --mut: #6B7280; --mut2: #9CA3AF;
+      --line: #E5E7EB; --line2: #EBEBEA; --soft: #F3F3F2; --soft2: #FAFAF9;
+      --amber: #F5C800; --amber-h: #E8BB00; --amber-soft: #FFFBE6; --amber-ink: #854D0E;
+      --ok: #047857; --ok-bg: #ECFDF5; --ok-line: #A7F3D0;
+      --err: #B91C1C; --err-bg: #FEF2F2; --err-line: #FECACA;
+      --warn: #B45309;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #eef1f4;
-      color: #1a1a2e;
-      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
     }
+    button, input, select, textarea { font-family: inherit; }
 
-    header {
-      background: linear-gradient(100deg, #0f4d2b 0%, #15663a 55%, #1c7a45 100%);
-      color: #fff;
-      padding: 16px 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.25);
-      display: flex; justify-content: space-between; align-items: center;
+    /* ── Casca: menu lateral + conteúdo ───────────────────────────────── */
+    .app { display: flex; height: 100dvh; overflow: hidden; gap: 12px; padding: 12px; }
+    .sidebar {
+      width: 240px; flex-shrink: 0; background: var(--dark); border-radius: 16px;
+      display: flex; flex-direction: column; overflow-y: auto;
     }
-    header h1 { font-size: 1.3rem; font-weight: 600; letter-spacing: .5px; }
-    header p  { font-size: .8rem; opacity: .8; margin-top: 2px; }
-    .brand { display: flex; align-items: center; gap: 16px; min-width: 0; }
-    .brand-logo {
-      height: 50px; width: auto; background: #fff; border-radius: 9px;
-      padding: 7px 11px; box-shadow: 0 2px 6px rgba(0,0,0,.2); flex-shrink: 0;
+    .sb-logo { padding: 20px 20px 16px; }
+    .sb-logo img { display: block; width: 100%; max-width: 152px; height: auto; filter: invert(1); }
+    .sb-produto { margin-top: 14px; font-size: 13px; font-weight: 600; color: #fff; }
+    .sb-produto small { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; color: rgba(255,255,255,.4); }
+    .sb-div { height: 1px; margin: 0 16px; background: rgba(255,255,255,.08); flex-shrink: 0; }
+    .sb-bloco { padding: 16px 20px; }
+    .sb-rotulo {
+      display: block; margin-bottom: 6px; font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.3);
     }
-    .btn-config {
-      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35);
-      color: #fff; border-radius: 7px; padding: 7px 14px; cursor: pointer;
-      font-size: .83rem; white-space: nowrap; transition: background .15s;
-    }
-    .btn-config:hover { background: rgba(255,255,255,.28); }
-    .btn-config.sem-auth { background: rgba(231,76,60,.55); border-color: rgba(231,76,60,.7); }
-    .header-actions { display: flex; gap: 14px; align-items: center; }
-    .sistema-wrap { display: flex; flex-direction: column; gap: 2px; }
-    .sistema-wrap label { font-size: .66rem; text-transform: uppercase; letter-spacing: .6px; opacity: .7; }
     .sistema-sel {
-      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35);
-      color: #fff; border-radius: 7px; padding: 6px 9px; font-size: .85rem;
-      cursor: pointer; font-weight: 600;
+      width: 100%; padding: 6px 26px 6px 10px; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.1); background-color: rgba(255,255,255,.08);
+      color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239CA3AF' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
     }
-    .sistema-sel option { color: #1a2530; }
-    @media (max-width: 560px) {
-      header { flex-direction: column; gap: 12px; align-items: stretch; }
-      .brand { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .brand-logo { height: 44px; }
-      header h1 { font-size: 1.1rem; }
-      .header-actions { justify-content: space-between; }
+    .sistema-sel:hover:not(:focus) { border-color: rgba(255,255,255,.2); }
+    .sistema-sel:focus {
+      outline: none; border-color: rgba(245,200,0,.5);
+      box-shadow: 0 0 0 1px rgba(245,200,0,.25); background-color: rgba(255,255,255,.08);
+    }
+    .sistema-sel option { background: var(--dark); color: #fff; }
+
+    .sb-nav { flex: 1; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; }
+    .tab-btn, .btn-config {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+      padding: 8px 12px; border: none; border-radius: 6px; background: transparent;
+      color: rgba(255,255,255,.6); font-size: 13px; font-weight: 500;
+      text-align: left; cursor: pointer; transition: background .15s, color .15s;
+    }
+    .tab-btn svg, .btn-config svg { flex-shrink: 0; }
+    .tab-btn:hover, .btn-config:hover { background: rgba(255,255,255,.06); color: #fff; }
+    .tab-btn:focus-visible, .btn-config:focus-visible { outline: none; box-shadow: 0 0 0 1px rgba(245,200,0,.5); }
+    .tab-btn.active, .tab-btn.active:hover { background: var(--amber); color: var(--ink); }
+    .sb-rodape { padding: 12px 8px; }
+    .btn-config.sem-auth { color: #FCA5A5; background: rgba(239,68,68,.12); }
+
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar { display: none; }
+    .conteudo { flex: 1; overflow-y: auto; border-radius: 16px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .page-head { margin-bottom: 16px; }
+    .page-head h1 { font-size: 1rem; font-weight: 600; color: var(--ink); }
+    .page-head p { margin-top: 2px; font-size: .875rem; color: var(--mut2); }
+    .site-footer { text-align: center; padding: 18px 16px 8px; color: var(--mut2); font-size: .74rem; }
+    .site-footer strong { color: var(--mut); font-weight: 600; }
+    .sb-fundo { display: none; }
+
+    @media (max-width: 767px) {
+      .app { display: block; height: auto; overflow: visible; padding: 0; }
+      .sidebar {
+        position: fixed; left: 0; top: 0; bottom: 0; z-index: 900;
+        border-radius: 0 16px 16px 0; transform: translateX(-105%); transition: transform .2s;
+        box-shadow: 0 20px 60px rgba(0,0,0,.4);
+      }
+      .menu-aberto .sidebar { transform: none; }
+      .menu-aberto .sb-fundo { display: block; position: fixed; inset: 0; z-index: 890; background: rgba(0,0,0,.6); }
+      .main { overflow: visible; }
+      .topbar {
+        display: flex; align-items: center; gap: 12px; background: var(--dark);
+        padding: 12px 16px; position: sticky; top: 0; z-index: 50;
+      }
+      .topbar img { width: 112px; height: auto; filter: invert(1); }
+      .topbar span { margin-left: auto; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.7); }
+      .btn-menu {
+        display: flex; padding: 6px; border: none; border-radius: 6px;
+        background: transparent; color: rgba(255,255,255,.6); cursor: pointer;
+      }
+      .conteudo { overflow: visible; border-radius: 0; }
+      .container { padding: 16px; }
     }
 
-    .container { max-width: 780px; margin: 32px auto; padding: 0 16px 24px; }
-    .site-footer {
-      text-align: center; padding: 18px 16px 28px; color: #a0aec0;
-      font-size: .74rem; letter-spacing: .3px;
-    }
-    .site-footer strong { color: #15663a; font-weight: 600; }
-
-    .tabs { display: flex; gap: 4px; margin-bottom: -1px; }
-    .tab-btn {
-      padding: 10px 22px;
-      border: 1px solid #c8d0d8;
-      border-bottom: none;
-      background: #dde3ea;
-      color: #4a5568;
-      font-size: .9rem;
-      font-weight: 500;
-      cursor: pointer;
-      border-radius: 9px 9px 0 0;
-      transition: background .15s, color .15s;
-    }
-    .tab-btn:hover { background: #cfd7e0; }
-    .tab-btn.active {
-      background: #fff;
-      color: #15663a;
-      border-color: #c8d0d8;
-      font-weight: 600;
-    }
-
+    /* ── Cartão e formulário ──────────────────────────────────────────── */
     .card {
-      background: #fff;
-      border: 1px solid #dce3ea;
-      border-radius: 0 12px 12px 12px;
-      padding: 30px 34px;
-      box-shadow: 0 6px 24px rgba(15,77,43,.07);
+      background: var(--card); border: 1px solid var(--line2);
+      border-radius: 16px; padding: 24px 28px;
     }
 
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
 
     .section-title {
-      font-size: .7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .8px;
-      color: #718096;
-      margin: 24px 0 12px;
-      border-bottom: 1px solid #e8ecf0;
-      padding-bottom: 6px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--mut2); margin: 24px 0 12px;
+      border-bottom: 1px solid var(--soft); padding-bottom: 6px;
     }
     .section-title:first-of-type { margin-top: 0; }
 
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .full  { grid-column: 1 / -1; }
 
-    .field { display: flex; flex-direction: column; gap: 4px; }
-    label { font-size: .78rem; font-weight: 600; color: #4a5568; }
-    label .opt { font-weight: 400; color: #a0aec0; font-size: .72rem; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: .8rem; font-weight: 500; color: var(--ink2); }
+    label .opt { font-weight: 400; color: var(--mut2); font-size: .72rem; }
 
     input, textarea, select {
-      padding: 10px 12px;
-      border: 1px solid #cbd5e0;
-      border-radius: 8px;
-      font-size: .88rem;
-      color: #1a1a2e;
-      background: #f7f9fc;
-      transition: border-color .15s, box-shadow .15s, background .15s;
-      width: 100%;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+      font-size: .88rem; color: var(--ink); background: #fff;
+      transition: border-color .15s, box-shadow .15s; width: 100%;
     }
-    input:hover:not(:focus), textarea:hover:not(:focus), select:hover:not(:focus) { border-color: #9fb3c8; }
+    input::placeholder, textarea::placeholder { color: var(--mut2); }
+    input:hover:not(:focus), textarea:hover:not(:focus), select:hover:not(:focus) { border-color: #D1D5DB; }
     input:focus, textarea:focus, select:focus {
-      outline: none;
-      border-color: #15663a;
-      box-shadow: 0 0 0 3px rgba(21,102,58,.18);
-      background: #fff;
+      outline: none; border-color: var(--amber);
+      box-shadow: 0 0 0 3px rgba(245,200,0,.25); background: #fff;
     }
+    input[type="checkbox"] { width: auto; padding: 0; accent-color: var(--ink); cursor: pointer; }
+
     .cnpj-group { display: flex; gap: 6px; flex-wrap: wrap; }
     .cnpj-btn {
-      padding: 7px 13px;
-      border: 1px solid #cbd5e0;
-      border-radius: 5px;
-      background: #f7f9fc;
-      color: #4a5568;
-      font-size: .8rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all .15s;
-      white-space: nowrap;
-      line-height: 1.3;
+      padding: 7px 13px; border: 1px solid var(--line); border-radius: 8px;
+      background: #fff; color: var(--ink2); font-size: .8rem; font-weight: 500;
+      cursor: pointer; transition: all .15s; white-space: nowrap; line-height: 1.3;
     }
-    .cnpj-btn:hover { border-color: #15663a; color: #15663a; background: #eaf4ec; }
-    .cnpj-btn.active { border-color: #15663a; background: #15663a; color: #fff; }
-    .cnpj-btn small { display: block; font-weight: 400; font-size: .72rem; opacity: .8; }
+    .cnpj-btn:hover { border-color: var(--amber); background: var(--amber-soft); }
+    .cnpj-btn.active { border-color: var(--amber); background: var(--amber); color: var(--ink); }
+    .cnpj-btn small { display: block; font-weight: 400; font-size: .72rem; opacity: .75; }
 
     select { cursor: pointer; appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23718096' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 10px center;
       padding-right: 28px;
     }
-    select option[value=""] { color: #a0aec0; }
+    select option[value=""] { color: var(--mut2); }
     textarea { resize: vertical; min-height: 80px; }
 
-    .btn-submit {
-      margin-top: 24px;
-      width: 100%;
-      padding: 12px;
-      background: #15663a;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: .95rem;
-      font-weight: 600;
-      cursor: pointer;
-      box-shadow: 0 2px 8px rgba(15,77,43,.18);
-      transition: background .15s, transform .12s, box-shadow .15s, opacity .15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
+    /* ── Botões ───────────────────────────────────────────────────────── */
+    .btn-submit, .btn-search, .btn-massa, .btn-modal-baixa, .btn-baixa-row {
+      background: var(--amber); color: var(--ink); border: none; border-radius: 8px;
+      font-weight: 600; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 1px 2px rgba(0,0,0,.05); transition: background .15s, opacity .15s;
     }
-    .btn-submit:hover:not(:disabled) { background: #0f4d2b; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(15,77,43,.28); }
-    .btn-submit:active:not(:disabled) { transform: translateY(0); box-shadow: 0 2px 8px rgba(15,77,43,.18); }
-    .btn-submit:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
+    .btn-submit:hover:not(:disabled), .btn-search:hover:not(:disabled), .btn-massa:hover:not(:disabled),
+    .btn-modal-baixa:hover:not(:disabled), .btn-baixa-row:hover:not(:disabled) { background: var(--amber-h); }
+    .btn-submit:focus-visible, .btn-search:focus-visible, .btn-massa:focus-visible,
+    .btn-modal-baixa:focus-visible, .btn-baixa-row:focus-visible {
+      outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--amber);
+    }
+    .btn-submit:disabled, .btn-search:disabled, .btn-massa:disabled,
+    .btn-modal-baixa:disabled, .btn-baixa-row:disabled { opacity: .5; cursor: not-allowed; }
+
+    .btn-submit {
+      margin-top: 24px; width: 100%; padding: 12px; font-size: .9rem;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-search      { padding: 10px 22px; font-size: .875rem; }
+    .btn-massa       { padding: 9px 20px;  font-size: .85rem; }
+    .btn-modal-baixa { padding: 9px 22px;  font-size: .85rem; }
+    .btn-baixa-row   { padding: 5px 12px;  font-size: .76rem; border-radius: 6px; }
+
+    .btn-export, .btn-modal-cancel {
+      padding: 9px 16px; background: #fff; color: var(--ink2);
+      border: 1px solid var(--line); border-radius: 8px;
+      font-size: .82rem; font-weight: 500; cursor: pointer; transition: background .15s;
+    }
+    .btn-export:hover, .btn-modal-cancel:hover { background: var(--soft); }
 
     .spinner {
       width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,.4);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      display: none;
+      border: 2px solid rgba(17,17,17,.25); border-top-color: var(--ink);
+      border-radius: 50%; animation: spin .7s linear infinite; display: none;
     }
     .btn-submit.loading .spinner { display: block; }
     .btn-submit.loading .btn-text::before { content: 'Enviando…'; }
@@ -197,17 +208,12 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     .response-box {
-      margin-top: 20px;
-      padding: 14px 16px;
-      border-radius: 6px;
-      font-size: .85rem;
-      line-height: 1.5;
-      display: none;
-      white-space: pre-wrap;
-      word-break: break-word;
+      margin-top: 20px; padding: 12px 16px; border-radius: 8px;
+      font-size: .85rem; line-height: 1.5; display: none;
+      white-space: pre-wrap; word-break: break-word;
     }
-    .response-box.success { background: #e6ffed; border: 1px solid #68d391; color: #22543d; display: block; }
-    .response-box.error   { background: #fff5f5; border: 1px solid #fc8181; color: #742a2a; display: block; }
+    .response-box.success { background: var(--ok-bg);  border: 1px solid var(--ok-line);  color: #065F46; display: block; }
+    .response-box.error   { background: var(--err-bg); border: 1px solid var(--err-line); color: var(--err); display: block; }
 
     @media (max-width: 560px) {
       .card { padding: 20px 16px; }
@@ -217,325 +223,208 @@
     /* ── Combobox pesquisável ─────────────────────────────────────── */
     .combo-wrap { position: relative; }
     .combo-input {
-      width: 100%;
-      padding: 8px 32px 8px 11px;
-      border: 1px solid #cbd5e0;
-      border-radius: 5px;
-      font-size: .88rem;
-      color: #1a1a2e;
-      background: #f7f9fc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23718096' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat right 10px center;
+      width: 100%; padding: 10px 32px 10px 12px;
+      border: 1px solid var(--line); border-radius: 8px;
+      font-size: .88rem; color: var(--ink);
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") no-repeat right 10px center;
       transition: border-color .15s, box-shadow .15s;
     }
     .combo-input:focus {
-      outline: none;
-      border-color: #15663a;
-      box-shadow: 0 0 0 3px rgba(21,102,58,.18);
-      background-color: #fff;
+      outline: none; border-color: var(--amber);
+      box-shadow: 0 0 0 3px rgba(245,200,0,.25); background-color: #fff;
     }
     .combo-dropdown {
-      display: none;
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0; right: 0;
-      background: #fff;
-      border: 1px solid #c8d0d8;
-      border-radius: 6px;
-      box-shadow: 0 6px 20px rgba(0,0,0,.12);
-      max-height: 260px;
-      overflow-y: auto;
-      z-index: 100;
+      display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: #fff; border: 1px solid var(--line); border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.12);
+      max-height: 260px; overflow-y: auto; z-index: 100;
     }
-    .combo-item {
-      padding: 8px 12px;
-      cursor: pointer;
-      border-bottom: 1px solid #f0f2f5;
-      transition: background .1s;
-    }
+    .combo-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--soft); transition: background .1s; }
     .combo-item:last-child { border-bottom: none; }
-    .combo-item:hover, .combo-item.hi { background: #eaf4ec; }
+    .combo-item:hover, .combo-item.hi { background: var(--amber-soft); }
     .combo-code {
-      font-weight: 700;
-      font-size: .78rem;
-      color: #15663a;
-      font-family: monospace;
-      letter-spacing: .5px;
-      margin-right: 6px;
+      font-weight: 700; font-size: .78rem; color: var(--amber-ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .5px; margin-right: 6px;
     }
-    .combo-desc { font-size: .82rem; color: #2d3748; }
+    .combo-desc { font-size: .82rem; color: var(--ink2); }
     .combo-more, .combo-empty {
-      padding: 8px 12px;
-      font-size: .8rem;
-      color: #718096;
-      font-style: italic;
-      text-align: center;
+      padding: 8px 12px; font-size: .8rem; color: var(--mut);
+      font-style: italic; text-align: center;
     }
     .combo-selected {
-      font-size: .78rem;
-      color: #22543d;
-      background: #e6ffed;
-      border: 1px solid #68d391;
-      border-radius: 4px;
-      padding: 4px 8px;
-      margin-top: 5px;
-      display: none;
+      font-size: .78rem; color: var(--amber-ink); background: var(--amber-soft);
+      border: 1px solid #FDE68A; border-radius: 6px;
+      padding: 4px 8px; margin-top: 5px; display: none;
     }
 
     /* ── Botão Replicar ───────────────────────────────────────────── */
     .btn-replicate {
-      display: none;
-      width: 100%;
-      margin-bottom: 20px;
-      padding: 10px 16px;
-      background: #fff;
-      border: 1.5px dashed #15663a;
-      border-radius: 6px;
-      color: #15663a;
-      font-size: .88rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background .15s;
-      text-align: left;
-      gap: 8px;
-      align-items: center;
+      display: none; width: 100%; margin-bottom: 20px; padding: 10px 16px;
+      background: var(--amber-soft); border: 1px solid #FDE68A; border-radius: 12px;
+      color: var(--ink); font-size: .88rem; font-weight: 600; cursor: pointer;
+      transition: background .15s; text-align: left; gap: 8px; align-items: center;
     }
-    .btn-replicate:hover { background: #eaf4ec; }
-    .btn-replicate .rep-meta {
-      display: block;
-      font-weight: 400;
-      font-size: .75rem;
-      color: #718096;
-      margin-top: 1px;
-    }
+    .btn-replicate:hover { background: #FFF7CC; }
+    .btn-replicate .rep-meta { display: block; font-weight: 400; font-size: .75rem; color: var(--mut); margin-top: 1px; }
 
     /* ── Consulta / tabela ───────────────────────────────────────────── */
     .date-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; }
     .date-row .field { margin: 0; }
-    input[type="date"] {
-      padding: 8px 11px;
-      border: 1px solid #cbd5e0;
-      border-radius: 5px;
-      font-size: .88rem;
-      color: #1a1a2e;
-      background: #f7f9fc;
-      width: 100%;
-      transition: border-color .15s, box-shadow .15s;
-    }
-    input[type="date"]:focus {
-      outline: none; border-color: #15663a;
-      box-shadow: 0 0 0 3px rgba(21,102,58,.18); background: #fff;
-    }
-    .btn-search {
-      padding: 9px 20px;
-      background: #15663a; color: #fff;
-      border: none; border-radius: 5px;
-      font-size: .88rem; font-weight: 600;
-      cursor: pointer; white-space: nowrap;
-      transition: background .15s;
-    }
-    .btn-search:hover:not(:disabled) { background: #0f4d2b; }
-    .btn-search:disabled { opacity: .6; cursor: not-allowed; }
 
     .results-meta {
       display: flex; justify-content: space-between; align-items: center;
       margin: 20px 0 10px; flex-wrap: wrap; gap: 8px;
     }
-    .results-count { font-size: .85rem; color: #4a5568; font-weight: 600; }
-    .btn-export {
-      padding: 7px 14px;
-      background: #276221; color: #fff;
-      border: none; border-radius: 5px;
-      font-size: .82rem; font-weight: 600;
-      cursor: pointer; transition: background .15s;
-    }
-    .btn-export:hover { background: #1e4d19; }
+    .results-count { font-size: .85rem; color: var(--ink2); font-weight: 600; }
 
-    .results-table-wrap { overflow: auto; max-height: 540px; border-radius: 10px; border: 1px solid #e8ecf0; }
-    .results-table {
-      width: 100%; border-collapse: collapse;
-      font-size: .82rem;
-    }
+    .results-table-wrap { overflow: auto; max-height: 540px; border-radius: 12px; border: 1px solid var(--line2); }
+    .results-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
     .results-table th {
-      background: #15663a; color: #fff;
-      padding: 11px 10px; text-align: left;
-      font-size: .75rem; font-weight: 700;
-      letter-spacing: .4px; white-space: nowrap;
+      background: var(--soft2); color: var(--mut2);
+      padding: 10px 12px; text-align: left;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+      white-space: nowrap; border-bottom: 1px solid var(--line2);
       position: sticky; top: 0; z-index: 2;
     }
     .results-table td {
-      padding: 8px 10px;
-      border-bottom: 1px solid #e8ecf0;
-      color: #2d3748; vertical-align: middle;
+      padding: 9px 12px; border-bottom: 1px solid var(--soft);
+      color: var(--ink2); vertical-align: middle;
     }
+    .results-table td strong { color: var(--ink); }
     .results-table tr:last-child td { border-bottom: none; }
-    .results-table tr:nth-child(even) td { background: #f7f9fc; }
-    .results-table tr:hover td { background: #eaf4ec; }
-    .badge {
-      display: inline-block; padding: 2px 8px;
-      border-radius: 10px; font-size: .72rem; font-weight: 700;
-    }
-    .badge-open   { background: #fefcbf; color: #744210; }
-    .badge-done   { background: #e6ffed; color: #22543d; }
-    .badge-cancel { background: #fff5f5; color: #742a2a; }
-    .no-results {
-      text-align: center; padding: 40px 20px;
-      color: #718096; font-size: .9rem;
-    }
+    .results-table tbody tr:hover td { background: var(--soft2); }
+    .results-table tr.linha-bloqueada td { background: var(--soft2); color: var(--mut2); }
+    .results-table tr.linha-bloqueada td strong { color: var(--mut); }
+    .results-table tr.linha-bloqueada td.status-err { color: #DC2626; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+    .badge-open   { background: var(--amber-soft); color: var(--amber-ink); }
+    .badge-done   { background: var(--ok-bg);  color: var(--ok); }
+    .badge-cancel { background: var(--err-bg); color: var(--err); }
+    .no-results { text-align: center; padding: 40px 20px; color: var(--mut); font-size: .9rem; }
     @media (max-width: 560px) {
       .date-row { grid-template-columns: 1fr; }
     }
 
-    /* ── Modal de Baixa ──────────────────────────────────────────────── */
+    /* ── Modais ──────────────────────────────────────────────────────── */
     .modal-overlay {
       display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,.45); z-index: 1000;
+      background: rgba(0,0,0,.6); z-index: 1000;
       align-items: center; justify-content: center;
     }
     .modal-overlay.open { display: flex; }
     .modal-box {
-      background: #fff; border-radius: 10px;
+      background: #fff; border-radius: 16px;
       width: min(680px, 96vw); max-height: 90vh;
-      overflow-y: auto; padding: 28px 28px 20px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      overflow-y: auto; padding: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,.25);
     }
+    .modal-box .field { margin-bottom: 12px; }
     .modal-title {
-      font-size: 1rem; font-weight: 700; color: #1a1a2e;
-      margin: 0 0 18px; padding-bottom: 12px;
-      border-bottom: 2px solid #e8ecf0;
+      font-size: 1rem; font-weight: 600; color: var(--ink);
+      margin: 0 0 18px; padding-bottom: 12px; border-bottom: 1px solid var(--soft);
     }
     .modal-info-grid {
       display: grid; grid-template-columns: 1fr 1fr;
-      gap: 8px 20px; margin-bottom: 16px;
-      font-size: .82rem;
+      gap: 8px 20px; margin-bottom: 16px; font-size: .82rem;
     }
-    .modal-info-grid span { color: #718096; }
-    .modal-info-grid strong { display: block; color: #1a1a2e; }
+    .modal-info-grid span { color: var(--mut); }
+    .modal-info-grid strong { display: block; color: var(--ink); }
     .modal-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-bottom: 14px; }
     .modal-fields .full { grid-column: 1 / -1; }
-    .modal-fields label { font-size: .78rem; font-weight: 600; color: #4a5568; display: block; margin-bottom: 3px; }
-    .modal-fields input, .modal-fields textarea, .modal-fields select {
-      width: 100%; padding: 7px 10px; border: 1px solid #cbd5e0;
-      border-radius: 5px; font-size: .85rem; color: #1a1a2e;
-      background: #f7f9fc; box-sizing: border-box;
-    }
-    .modal-fields input:focus, .modal-fields textarea:focus {
-      outline: none; border-color: #15663a;
-      box-shadow: 0 0 0 3px rgba(21,102,58,.18); background: #fff;
-    }
+    .modal-fields label { display: block; margin-bottom: 4px; }
+    .modal-fields input, .modal-fields textarea, .modal-fields select { padding: 8px 10px; font-size: .85rem; }
     .modal-section-title {
-      font-size: .78rem; font-weight: 700; color: #4a5568;
-      text-transform: uppercase; letter-spacing: .5px;
-      margin: 14px 0 8px;
+      font-size: 11px; font-weight: 600; color: var(--mut2);
+      text-transform: uppercase; letter-spacing: .08em; margin: 14px 0 8px;
     }
     .itens-table { width: 100%; border-collapse: collapse; font-size: .8rem; margin-bottom: 14px; }
     .itens-table th {
-      background: #f0f4f8; color: #4a5568; font-size: .73rem;
-      font-weight: 700; padding: 6px 8px; text-align: left;
+      background: var(--soft2); color: var(--mut2); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .06em; padding: 7px 8px; text-align: left;
     }
-    .itens-table td { padding: 6px 8px; border-bottom: 1px solid #e8ecf0; }
-    .itens-table input[type=number] {
-      width: 80px; padding: 4px 6px; border: 1px solid #cbd5e0;
-      border-radius: 4px; font-size: .82rem; text-align: right;
-    }
+    .itens-table td { padding: 6px 8px; border-bottom: 1px solid var(--soft); }
+    .itens-table input[type=number] { width: 90px; padding: 4px 6px; border-radius: 6px; font-size: .82rem; text-align: right; }
     .modal-footer {
       display: flex; gap: 10px; justify-content: flex-end;
-      padding-top: 14px; border-top: 1px solid #e8ecf0; margin-top: 4px;
+      padding-top: 14px; border-top: 1px solid var(--soft); margin-top: 4px;
     }
-    .btn-modal-cancel {
-      padding: 8px 18px; border: 1px solid #cbd5e0;
-      background: #fff; color: #4a5568; border-radius: 5px;
-      font-size: .85rem; cursor: pointer;
-    }
-    .btn-modal-baixa {
-      padding: 8px 22px; background: #15663a; color: #fff;
-      border: none; border-radius: 5px; font-size: .85rem;
-      font-weight: 700; cursor: pointer; transition: background .15s;
-    }
-    .btn-modal-baixa:hover:not(:disabled) { background: #0f4d2b; }
-    .btn-modal-baixa:disabled { opacity: .6; cursor: not-allowed; }
     .modal-resp { margin-top: 10px; font-size: .85rem; }
-    .btn-baixa-row {
-      padding: 5px 12px; background: #15663a; color: #fff;
-      border: none; border-radius: 4px; font-size: .76rem;
-      font-weight: 700; cursor: pointer; white-space: nowrap;
-    }
-    .btn-baixa-row:hover { background: #0f4d2b; }
     @media (max-width: 560px) {
       .modal-fields { grid-template-columns: 1fr; }
       .modal-info-grid { grid-template-columns: 1fr; }
     }
 
-    /* ── Baixa em Massa ──────────────────────────────────────────────── */
-    .massa-section { margin-top: 32px; padding-top: 24px; border-top: 2px dashed #e8ecf0; }
+    /* ── Baixa por planilha ──────────────────────────────────────────── */
+    .massa-section { margin-top: 0; }
     .upload-area {
       display: flex; flex-direction: column; align-items: center; gap: 6px;
-      border: 2px dashed #cbd5e0; border-radius: 8px;
+      border: 1.5px dashed #D1D5DB; border-radius: 12px;
       padding: 28px 20px; text-align: center; cursor: pointer;
-      color: #718096; font-size: .9rem;
+      color: var(--mut); font-size: .9rem; font-weight: 500;
       transition: border-color .15s, background .15s; margin-bottom: 14px;
     }
-    .upload-area:hover, .upload-area.drag-over {
-      border-color: #15663a; background: #f0f4f8; color: #15663a;
-    }
-    .upload-area small { font-size: .75rem; color: #a0aec0; }
-    .btn-massa {
-      padding: 8px 20px; background: #15663a; color: #fff;
-      border: none; border-radius: 5px; font-size: .85rem;
-      font-weight: 700; cursor: pointer; transition: background .15s;
-    }
-    .btn-massa:hover:not(:disabled) { background: #0f4d2b; }
-    .btn-massa:disabled { opacity: .6; cursor: not-allowed; }
+    .upload-area:hover, .upload-area.drag-over { border-color: var(--amber); background: var(--amber-soft); color: var(--ink); }
+    .upload-area small { font-size: .75rem; font-weight: 400; color: var(--mut2); }
     .massa-table-wrap {
-      overflow-x: auto; border-radius: 6px; border: 1px solid #e8ecf0;
+      overflow-x: auto; border-radius: 12px; border: 1px solid var(--line2);
       max-height: 480px; overflow-y: auto;
     }
     .massa-input {
-      border: none; border-bottom: 1px solid #cbd5e0;
+      border: none; border-bottom: 1px solid var(--line); border-radius: 0;
       padding: 2px 4px; font-size: .8rem; background: transparent;
-      width: 100%; box-sizing: border-box; font-family: inherit; color: #2d3748;
+      width: 100%; box-sizing: border-box; font-family: inherit; color: var(--ink2);
     }
-    .massa-input:focus { outline: none; border-bottom: 2px solid #4ca23f; background: #eaf6ee; }
-    .massa-input::placeholder { color: #b0bec5; }
-    .cell-warn input { border-bottom-color: #e74c3c; }
-    .cell-warn input::placeholder { color: #e74c3c; }
-    .massa-progress-bar {
-      height: 10px; background: #e8ecf0; border-radius: 5px;
-      margin-top: 14px; overflow: hidden;
+    .massa-input:hover:not(:focus) { border-color: #D1D5DB; }
+    .massa-input:focus { outline: none; box-shadow: none; border-color: var(--amber); border-bottom-width: 2px; background: var(--amber-soft); }
+    .massa-input:disabled { color: var(--mut2); border-bottom-color: transparent; }
+    .massa-input::placeholder { color: #C4C4C4; }
+    .cell-warn input { border-bottom-color: #EF4444; }
+    .cell-warn input::placeholder { color: #EF4444; }
+    .massa-progress-bar { height: 8px; background: var(--soft); border-radius: 999px; margin-top: 14px; overflow: hidden; }
+    .massa-progress-fill { height: 100%; background: var(--amber); width: 0%; transition: width .25s; border-radius: 999px; }
+    .status-wait { color: var(--mut2); font-size: .77rem; }
+    .status-ok   { color: var(--ok); font-weight: 600; font-size: .77rem; }
+    .status-err  { color: #DC2626; font-weight: 600; font-size: .77rem; }
+    .status-skip { color: var(--warn); font-size: .77rem; }
+
+    .passos { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+    .passo {
+      display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px;
+      border-radius: 999px; background: var(--soft); color: var(--mut); font-size: .8rem; font-weight: 500;
     }
-    .massa-progress-fill {
-      height: 100%; background: linear-gradient(90deg,#15663a,#4ca23f);
-      width: 0%; transition: width .25s; border-radius: 5px;
+    .passo b {
+      display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+      background: #fff; color: var(--mut); font-size: .72rem; font-weight: 700;
     }
-    .status-wait { color: #a0aec0; font-size: .77rem; }
-    .status-ok   { color: #276221; font-weight: 700; font-size: .77rem; }
-    .status-err  { color: #c0392b; font-weight: 600; font-size: .77rem; }
-    .status-skip { color: #e67e22; font-size: .77rem; }
+    .passo.feito { background: var(--amber-soft); color: var(--amber-ink); }
+    .passo.feito b { background: var(--amber); color: var(--ink); }
+    .ajuda { font-size: .84rem; color: var(--mut); margin: 0 0 14px; line-height: 1.5; }
+    .resumo-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .chip { padding: 3px 10px; border-radius: 999px; font-size: .76rem; font-weight: 600; background: var(--soft); color: var(--ink2); }
+    .chip-ok   { background: var(--ok-bg); color: var(--ok); }
+    .chip-warn { background: var(--amber-soft); color: var(--amber-ink); }
+    .chip-err  { background: var(--err-bg); color: var(--err); }
+    details.recolhido { margin-top: 20px; border: 1px solid var(--line2); border-radius: 12px; }
+    details.recolhido > summary {
+      padding: 12px 16px; cursor: pointer; font-size: .88rem; font-weight: 600; color: var(--ink2);
+      list-style: none; display: flex; align-items: center; gap: 8px;
+    }
+    details.recolhido > summary::-webkit-details-marker { display: none; }
+    details.recolhido > summary::before { content: '+'; width: 14px; color: var(--mut2); font-weight: 400; font-size: 1rem; }
+    details.recolhido[open] > summary::before { content: '–'; }
+    details.recolhido > summary small { font-weight: 400; color: var(--mut2); }
+    details.recolhido > .recolhido-corpo { padding: 4px 16px 18px; }
   </style>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
-<header>
-  <div class="brand">
-    <img src="logo-uniao.png" alt="União Recicláveis" class="brand-logo">
-    <div>
-      <h1>E-MTR — Manifesto de Transporte de Resíduos</h1>
-      <p>Sistema Eletrônico de Gerenciamento de Resíduos</p>
-    </div>
-  </div>
-  <div class="header-actions">
-    <div class="sistema-wrap">
-      <label for="sistema-sel">Sistema</label>
-      <select class="sistema-sel" id="sistema-sel" onchange="trocarSistema(this.value)"></select>
-    </div>
-    <button class="btn-config" id="btn-config" onclick="abrirConfig()">⚙ Configurações</button>
-  </div>
-</header>
 
 <!-- ===== Modal Configurações ===== -->
 <div id="modal-config" class="modal-overlay" style="display:none" onclick="if(event.target===this)fecharConfig()">
   <div class="modal-box" style="max-width:420px">
-    <h3 id="cfg-titulo" style="margin:0 0 20px;color:#15663a;font-size:1.05rem">Acesso</h3>
-    <p style="font-size:.82rem;color:#718096;margin:-12px 0 18px">
+    <h3 id="cfg-titulo" style="margin:0 0 20px;color:#111111;font-size:1.05rem">Acesso</h3>
+    <p style="font-size:.82rem;color:#6B7280;margin:-12px 0 18px">
       Cada acesso é um login. Você pode ter vários (ex.: FEAM Leopoldina, FEAM Bituruna). Salvos no navegador.
     </p>
     <div class="field">
@@ -545,7 +434,7 @@
     <div class="field">
       <label>Tipo de sistema</label>
       <select id="cfg-tipo" onchange="_cfgTipoChange()"
-              style="width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cbd5e0;border-radius:8px;font-size:.9rem;background:#fff">
+              style="width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #E5E7EB;border-radius:8px;font-size:.9rem;background:#fff">
         <option value="feam">FEAM-MG (API antiga)</option>
         <option value="sinir">SINIR (API nova)</option>
         <option value="inea">INEA-RJ (API nova)</option>
@@ -554,7 +443,7 @@
     <!-- Campos FEAM-MG (API antiga /api) -->
     <div class="dialect-feam">
       <div class="field">
-        <label>Pessoa Código <span style="font-weight:400;color:#a0aec0">(código da unidade)</span></label>
+        <label>Pessoa Código <span style="font-weight:400;color:#9CA3AF">(código da unidade)</span></label>
         <input type="number" id="cfg-pessoaCodigo" placeholder="Ex.: 176165">
       </div>
       <div class="field">
@@ -569,13 +458,13 @@
     <!-- Campos SINIR / INEA (API nova /apiws/rest) -->
     <div class="dialect-sinir">
       <div class="field">
-        <label>CNPJ do empreendimento <span style="font-weight:400;color:#a0aec0">(ou CPF — o documento da empresa)</span></label>
+        <label>CNPJ do empreendimento <span style="font-weight:400;color:#9CA3AF">(ou CPF — o documento da empresa)</span></label>
         <input type="text" id="cfg-cpfCnpj" placeholder="00000000000000" maxlength="18">
       </div>
       <div class="field">
-        <label>Código de unidade <span style="font-weight:400;color:#a0aec0">(número, não é o CNPJ)</span></label>
+        <label>Código de unidade <span style="font-weight:400;color:#9CA3AF">(número, não é o CNPJ)</span></label>
         <input type="text" id="cfg-unidade" placeholder="Ex.: 12346">
-        <small style="display:block;color:#a0aec0;font-size:.72rem;margin-top:3px">
+        <small style="display:block;color:#9CA3AF;font-size:.72rem;margin-top:3px">
           Veja em "Lista de Unidades" / perfil no site do SINIR — é sequencial (ex.: 12346)
         </small>
       </div>
@@ -585,12 +474,12 @@
       <input type="password" id="cfg-senha" placeholder="Senha de acesso">
     </div>
     <div class="field">
-      <label>URL da API <span style="font-weight:400;color:#a0aec0">(padrão do sistema)</span></label>
+      <label>URL da API <span style="font-weight:400;color:#9CA3AF">(padrão do sistema)</span></label>
       <input type="text" id="cfg-apiBase" placeholder="https://.../api">
     </div>
     <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:20px">
       <button class="btn-modal-cancel" id="cfg-excluir" onclick="excluirPerfil()"
-              style="color:#c0392b;border-color:#e8b4ae">Excluir</button>
+              style="color:#DC2626;border-color:#FECACA">Excluir</button>
       <div style="display:flex;gap:8px">
         <button class="btn-modal-cancel" onclick="fecharConfig()">Cancelar</button>
         <button class="btn-modal-baixa" onclick="salvarConfig()">Salvar</button>
@@ -599,12 +488,44 @@
   </div>
 </div>
 
+<div class="app" id="app">
+  <div class="sb-fundo" onclick="fecharMenu()"></div>
+
+  <!-- ===== Menu lateral (padrão do portal) ===== -->
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <img src="logo-iep.png" alt="Inteligência em Pesados" width="3684" height="896">
+      <p class="sb-produto">Inteligência MTR<small>Manifesto de Transporte de Resíduos</small></p>
+    </div>
+    <div class="sb-div"></div>
+    <div class="sb-bloco">
+      <label class="sb-rotulo" for="sistema-sel">Sistema</label>
+      <select class="sistema-sel" id="sistema-sel" onchange="trocarSistema(this.value)"></select>
+    </div>
+    <div class="sb-div"></div>
+    <nav class="sb-nav">
+      <button class="tab-btn active" onclick="switchTab('emitir', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>Emitir MTR</button>
+      <button class="tab-btn" onclick="switchTab('baixa', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Baixa c/ número</button>
+      <button class="tab-btn" onclick="switchTab('conc', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7a3.5 3.5 0 0 0 6 0z"/><path d="M19 7l-3 7a3.5 3.5 0 0 0 6 0z"/><path d="M8 21h8"/></svg>Baixa s/ número</button>
+      <button class="tab-btn" onclick="switchTab('consulta', this)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Consultar MTRs</button>
+    </nav>
+    <div class="sb-div"></div>
+    <div class="sb-rodape">
+      <button class="btn-config" id="btn-config" onclick="abrirConfig()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span id="btn-config-txt">Configurações</span></button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn-menu" onclick="abrirMenu()" aria-label="Abrir menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <img src="logo-iep.png" alt="Inteligência em Pesados" width="3684" height="896">
+      <span>Inteligência MTR</span>
+    </header>
+    <div class="conteudo">
 <div class="container">
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('emitir', this)">Emitir MTR</button>
-    <button class="tab-btn"        onclick="switchTab('baixa', this)">Dar Baixa no MTR</button>
-    <button class="tab-btn"        onclick="switchTab('consulta', this)">Consultar MTRs</button>
-    <button class="tab-btn"        onclick="switchTab('conc', this)">Conciliação Balança</button>
+  <div class="page-head">
+    <h1 id="page-titulo">Emitir MTR</h1>
+    <p id="page-sub">Emissão do manifesto no sistema selecionado.</p>
   </div>
 
   <div class="card">
@@ -613,7 +534,7 @@
     <div id="panel-emitir" class="tab-panel active">
 
       <button type="button" class="btn-replicate" id="btn-replicate" onclick="replicarUltimoMTR()">
-        ↩ Replicar último MTR emitido
+        Replicar último MTR emitido
         <span class="rep-meta" id="rep-meta"></span>
       </button>
 
@@ -743,8 +664,76 @@
       <div class="response-box" id="resp-emitir"></div>
     </div>
 
-    <!-- ===== TAB 2: Dar Baixa no MTR ===== -->
+    <!-- ===== Baixa c/ número ===== -->
     <div id="panel-baixa" class="tab-panel">
+
+      <div class="massa-section">
+        <div class="passos" id="bn-passos">
+          <span class="passo" data-p="1"><b>1</b>Subir planilha</span>
+          <span class="passo" data-p="2"><b>2</b>Conferir</span>
+          <span class="passo" data-p="3"><b>3</b>Baixar</span>
+        </div>
+        <p class="ajuda">
+          Suba a planilha de pesagens com as colunas <strong>n° do MTR, Peso líquido (kg), Placa do cavalo,
+          Motorista e Data da pesagem</strong>. O sistema busca cada MTR no órgão pelo login
+          <strong id="bn-login-nome">—</strong>, completa os dados e deixa pronto para baixar com o peso da balança.
+          Também aceita a planilha exportada em Consultar MTRs ou em Baixa s/ número.
+        </p>
+
+        <label class="upload-area" for="csv-massa-input" id="upload-label"
+               ondragover="event.preventDefault();this.classList.add('drag-over')"
+               ondragleave="this.classList.remove('drag-over')"
+               ondrop="event.preventDefault();this.classList.remove('drag-over');
+                       document.getElementById('csv-massa-input').files=event.dataTransfer.files;
+                       handleCSVUpload({target:document.getElementById('csv-massa-input')})">
+          <span id="upload-label-text">Clique ou arraste a planilha aqui</span>
+          <small>.xlsx de pesagens com nº do MTR, .xlsx exportado pelo sistema ou .csv com ponto e vírgula</small>
+          <input type="file" id="csv-massa-input" accept=".xlsx,.csv" style="display:none"
+                 onchange="handleCSVUpload(event)" />
+        </label>
+
+        <div class="response-box" id="resp-massa" style="margin:0 0 14px"></div>
+
+        <div id="massa-preview" style="display:none">
+          <div class="resumo-chips" id="massa-chips" style="margin:0 0 12px"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 10px">
+            <span id="massa-count" style="font-size:.84rem;color:#374151;font-weight:600"></span>
+            <div style="display:flex;gap:8px">
+              <button class="btn-modal-cancel" onclick="limparCSV()">Limpar</button>
+              <button class="btn-massa" id="btn-massa" onclick="processarBaixasMassa()">Dar baixa</button>
+            </div>
+          </div>
+          <div class="massa-table-wrap">
+            <table class="results-table" id="massa-preview-table">
+              <thead><tr>
+                <th>Nº MTR</th><th style="min-width:150px">Status</th><th>Data Emissão</th>
+                <th>Gerador</th><th>Transportador</th>
+                <th style="min-width:110px">Data Recebimento</th>
+                <th style="min-width:110px">Motorista</th>
+                <th style="min-width:70px">Placa</th>
+                <th>Qt. Indicada</th>
+                <th style="min-width:80px">Qt. Recebida</th>
+                <th style="min-width:160px">Justificativa</th>
+                <th style="min-width:80px">Resíduo</th>
+              </tr></thead>
+              <tbody id="massa-preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="massa-progress-wrap" style="display:none">
+          <div class="massa-progress-bar">
+            <div class="massa-progress-fill" id="massa-progress-fill"></div>
+          </div>
+          <p id="massa-progress-label"
+             style="font-size:.82rem;color:#374151;margin:8px 0 0;text-align:center"></p>
+        </div>
+      </div>
+
+      <!-- Baixa de um MTR só, preenchida à mão -->
+      <details class="recolhido">
+        <summary>Baixa de um MTR só <small>preenchimento manual</small></summary>
+        <div class="recolhido-corpo">
 
       <p class="section-title">Identificação do Manifesto</p>
       <div class="grid">
@@ -828,61 +817,8 @@
       </button>
       <div class="response-box" id="resp-baixa"></div>
 
-      <!-- ═══ Baixa em Massa ════════════════════════════════════════════════ -->
-      <div class="massa-section">
-        <p class="section-title">Baixa em Massa — Upload de Planilha</p>
-        <p style="font-size:.84rem;color:#718096;margin:0 0 14px">
-          Exporte a planilha na aba <strong>Consultar MTRs</strong>, preencha as datas,
-          verifique os dados e carregue o arquivo aqui.
-        </p>
-
-        <label class="upload-area" for="csv-massa-input" id="upload-label"
-               ondragover="event.preventDefault();this.classList.add('drag-over')"
-               ondragleave="this.classList.remove('drag-over')"
-               ondrop="event.preventDefault();this.classList.remove('drag-over');
-                       document.getElementById('csv-massa-input').files=event.dataTransfer.files;
-                       handleCSVUpload({target:document.getElementById('csv-massa-input')})">
-          <span id="upload-label-text">📂 Clique ou arraste o arquivo Excel aqui</span>
-          <small>Formato: .xlsx exportado pelo sistema (ou .csv com ponto-e-vírgula)</small>
-          <input type="file" id="csv-massa-input" accept=".xlsx,.csv" style="display:none"
-                 onchange="handleCSVUpload(event)" />
-        </label>
-
-        <div id="massa-preview" style="display:none">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 10px">
-            <span id="massa-count" style="font-size:.84rem;color:#4a5568;font-weight:600"></span>
-            <div style="display:flex;gap:8px">
-              <button class="btn-modal-cancel" onclick="limparCSV()">Limpar</button>
-              <button class="btn-massa" id="btn-massa" onclick="processarBaixasMassa()">▶ Processar Baixas</button>
-            </div>
-          </div>
-          <div class="massa-table-wrap">
-            <table class="results-table" id="massa-preview-table">
-              <thead><tr>
-                <th>Nº MTR</th><th>Data Emissão</th>
-                <th>Gerador</th><th>Transportador</th>
-                <th style="min-width:110px">Data Recebimento ✏</th>
-                <th style="min-width:110px">Motorista ✏</th>
-                <th style="min-width:70px">Placa ✏</th>
-                <th>Qt. Indicada</th>
-                <th style="min-width:80px">Qt. Recebida ✏</th>
-                <th style="min-width:160px">Justificativa ✏</th>
-                <th style="min-width:80px">Resíduo ✏</th>
-                <th>Status</th>
-              </tr></thead>
-              <tbody id="massa-preview-tbody"></tbody>
-            </table>
-          </div>
         </div>
-
-        <div id="massa-progress-wrap" style="display:none">
-          <div class="massa-progress-bar">
-            <div class="massa-progress-fill" id="massa-progress-fill"></div>
-          </div>
-          <p id="massa-progress-label"
-             style="font-size:.82rem;color:#4a5568;margin:8px 0 0;text-align:center"></p>
-        </div>
-      </div>
+      </details>
 
     </div>
 
@@ -908,13 +844,13 @@
       <!-- SINIR/INEA: consulta por número (API nova não lista por período) -->
       <div class="consulta-sinir" style="display:none">
         <p class="section-title">Números de MTR</p>
-        <p style="font-size:.82rem;color:#718096;margin:0 0 10px">
+        <p style="font-size:.82rem;color:#6B7280;margin:0 0 10px">
           A API do SINIR não lista por período — cole os números dos MTRs (um por linha).
           Pegue a lista no portal do SINIR.
         </p>
         <textarea id="c-numeros" rows="6"
           placeholder="Ex.:&#10;2509000123456&#10;2509000123457"
-          style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e0;border-radius:8px;font-family:monospace;font-size:.85rem;resize:vertical"></textarea>
+          style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #E5E7EB;border-radius:8px;font-family:monospace;font-size:.85rem;resize:vertical"></textarea>
       </div>
 
       <button class="btn-search" id="btn-consulta" onclick="submitConsulta()" style="margin-top:12px">
@@ -925,7 +861,7 @@
       <div id="consulta-results" style="display:none">
         <div class="results-meta">
           <span class="results-count" id="results-count"></span>
-          <button class="btn-export" onclick="exportarCSV()">⬇ Exportar Excel</button>
+          <button class="btn-export" onclick="exportarCSV()">Exportar Excel</button>
         </div>
         <div class="results-table-wrap">
           <table class="results-table" id="results-table">
@@ -946,7 +882,7 @@
 
     </div>
 
-    <!-- ===== TAB 4: Conciliação Balança ===== -->
+    <!-- ===== Baixa s/ número (conciliação com a balança) ===== -->
     <div id="panel-conc" class="tab-panel">
 
       <p class="section-title">1. Arquivo da balança</p>
@@ -956,11 +892,11 @@
              ondrop="event.preventDefault();this.classList.remove('drag-over');
                      document.getElementById('conc-file-input').files=event.dataTransfer.files;
                      concUpload({target:document.getElementById('conc-file-input')})">
-        <span id="conc-upload-label">📂 Clique ou arraste o(s) relatório(s) de pesagens (.xlsx)</span>
-        <small>Colunas esperadas: Nº Pesagem, Placa, Gerador, Data/hora de entrada, Peso Total Líquido (Kg), Aterro — pode selecionar mais de um arquivo</small>
+        <span id="conc-upload-label">Clique ou arraste o(s) relatório(s) de pesagens (.xlsx)</span>
+        <small>Colunas: Placa, Gerador, Data/hora de entrada, Peso Total Líquido (Kg), Aterro. Nº Pesagem é opcional. Pode selecionar mais de um arquivo</small>
         <input type="file" id="conc-file-input" accept=".xlsx" multiple style="display:none" onchange="concUpload(event)" />
       </label>
-      <div id="conc-file-info" style="display:none;font-size:.84rem;color:#4a5568;margin:10px 0 0"></div>
+      <div id="conc-file-info" style="display:none;font-size:.84rem;color:#374151;margin:10px 0 0"></div>
 
       <p class="section-title" style="margin-top:26px">2. Logins e MTRs</p>
       <div class="grid">
@@ -983,20 +919,25 @@
       </div>
       <div class="grid">
         <div class="field">
-          <label>Números de MTR do SINIR <span class="opt">um por linha — a API não lista por período; copie do portal</span></label>
+          <label>Números de MTR do SINIR <span class="opt">um por linha, copiados do portal</span></label>
           <textarea id="conc-numeros-sinir" rows="4" placeholder="331032128975&#10;331032128972&#10;…"
             style="font-family:monospace;font-size:.85rem"></textarea>
         </div>
         <div class="field">
-          <label>Números de MTR do INEA <span class="opt">um por linha — idem; copie do portal do INEA</span></label>
+          <label>Números de MTR do INEA <span class="opt">um por linha, copiados do portal</span></label>
           <textarea id="conc-numeros-inea" rows="4" placeholder="2118015489&#10;2117945146&#10;…"
             style="font-family:monospace;font-size:.85rem"></textarea>
         </div>
       </div>
 
+      <div class="field" style="max-width:320px;margin-top:16px">
+        <label for="conc-janela">Janela de data <span class="opt">dias entre a emissão do MTR e a pesagem</span></label>
+        <input type="number" id="conc-janela" min="1" max="20" step="1" value="7" onchange="concSalvarJanela()" />
+      </div>
+
       <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
         <button class="btn-search" id="btn-conc-buscar" onclick="concBuscar()">Buscar MTRs e conciliar</button>
-        <button class="btn-modal-cancel" onclick="concAbrirCadastro()">⚙ Cadastro de geradores</button>
+        <button class="btn-modal-cancel" onclick="concAbrirCadastro()">Cadastro de geradores</button>
       </div>
       <div class="response-box" id="resp-conc"></div>
 
@@ -1004,12 +945,13 @@
       <div id="conc-resultados" style="display:none">
 
         <p class="section-title" style="margin-top:28px">3. Conferência</p>
-        <div id="conc-resumo" style="font-size:.86rem;color:#4a5568;margin:0 0 14px"></div>
+        <div id="conc-resumo" style="font-size:.86rem;color:#374151;margin:0 0 14px"></div>
 
         <div id="conc-sec-propostas" style="display:none">
-          <p style="font-weight:700;font-size:.9rem;color:#15663a;margin:18px 0 8px">✔ Propostas de baixa</p>
-          <p style="font-size:.8rem;color:#718096;margin:0 0 8px">
+          <p style="font-weight:700;font-size:.9rem;color:#111111;margin:18px 0 8px">Propostas de baixa</p>
+          <p style="font-size:.8rem;color:#6B7280;margin:0 0 8px">
             Verde = soma fecha com a balança (≤10%) · Amarelo = 10–30% · Vermelho = diverge &gt;30% (desmarcado — confira antes).
+            MTR emitido mais de 1 dia antes da pesagem sai amarelo e desmarcado.
             O peso da balança é rateado entre os MTRs do grupo proporcionalmente à quantidade indicada.
           </p>
           <div class="massa-table-wrap">
@@ -1022,20 +964,20 @@
             </table>
           </div>
           <div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap">
-            <button class="btn-export" onclick="concExportarExcel()">⬇ Exportar conferência (Excel)</button>
-            <button class="btn-massa" id="btn-conc-processar" onclick="concProcessar()">▶ Dar baixa nas selecionadas</button>
-            <span id="conc-proc-label" style="font-size:.82rem;color:#4a5568"></span>
+            <button class="btn-export" onclick="concExportarExcel()">Exportar conferência (Excel)</button>
+            <button class="btn-massa" id="btn-conc-processar" onclick="concProcessar()">Dar baixa nas selecionadas</button>
+            <span id="conc-proc-label" style="font-size:.82rem;color:#374151"></span>
           </div>
-          <p style="font-size:.78rem;color:#718096;margin:8px 0 0">
-            A planilha exportada sai no formato da <strong>Baixa em Massa</strong>, já preenchida com data e peso
+          <p style="font-size:.78rem;color:#6B7280;margin:8px 0 0">
+            A planilha exportada sai no formato da aba <strong>Baixa c/ número</strong>, já preenchida com data e peso
             rateado da balança. Confira e corrija no Excel, selecione o sistema correspondente no topo da página
-            e suba na aba Dar Baixa. Linhas divergentes e MTRs sem pesagem vêm <strong>sem data</strong> — só são
+            e suba na aba Baixa c/ número. Linhas divergentes e MTRs sem pesagem vêm <strong>sem data</strong> — só são
             processados se você preencher.
           </p>
         </div>
 
         <div id="conc-sec-sempar" style="display:none">
-          <p style="font-weight:700;font-size:.9rem;color:#b45309;margin:24px 0 8px">⚠ Pesagens sem MTR correspondente</p>
+          <p style="font-weight:700;font-size:.9rem;color:#B45309;margin:24px 0 8px">Pesagens sem MTR correspondente</p>
           <div class="massa-table-wrap">
             <table class="results-table">
               <thead><tr><th>Pesagem</th><th>Data</th><th>Gerador (balança)</th><th>Balança (t)</th><th>Motivo</th></tr></thead>
@@ -1045,7 +987,7 @@
         </div>
 
         <div id="conc-sec-sobra" style="display:none">
-          <p style="font-weight:700;font-size:.9rem;color:#b45309;margin:24px 0 8px">⚠ MTRs pendentes sem pesagem</p>
+          <p style="font-weight:700;font-size:.9rem;color:#B45309;margin:24px 0 8px">MTRs pendentes sem pesagem</p>
           <div class="massa-table-wrap">
             <table class="results-table">
               <thead><tr><th>Nº MTR</th><th>Emissão</th><th>Gerador</th><th>Transportador</th><th>Indicado (t)</th><th>Sistema</th></tr></thead>
@@ -1055,7 +997,7 @@
         </div>
 
         <div id="conc-sec-armaz" style="display:none">
-          <p style="font-weight:700;font-size:.9rem;color:#718096;margin:24px 0 8px">ℹ Em Armazenamento Temporário (não recebem baixa)</p>
+          <p style="font-weight:700;font-size:.9rem;color:#6B7280;margin:24px 0 8px">Em Armazenamento Temporário (não recebem baixa)</p>
           <div class="massa-table-wrap">
             <table class="results-table">
               <thead><tr><th>Nº MTR</th><th>Emissão</th><th>Gerador</th><th>Situação</th></tr></thead>
@@ -1101,7 +1043,7 @@
         <input type="text" id="m-placa" />
       </div>
       <div class="full">
-        <label>Observações <span style="font-weight:400;color:#718096">opcional</span></label>
+        <label>Observações <span style="font-weight:400;color:#6B7280">opcional</span></label>
         <textarea id="m-obs" rows="2" placeholder="Observações do recebimento…"></textarea>
       </div>
     </div>
@@ -1128,7 +1070,7 @@
 <div class="modal-overlay" id="modal-cadastro" onclick="if(event.target===this)concFecharCadastro()">
   <div class="modal-box" style="max-width:980px">
     <p class="modal-title">Cadastro de geradores — balança × MTR</p>
-    <p style="font-size:.82rem;color:#718096;margin:0 0 14px">
+    <p style="font-size:.82rem;color:#6B7280;margin:0 0 14px">
       Liga o nome que a balança escreve ao CNPJ que aparece no MTR.
       <strong>Papel</strong>: onde esse CNPJ aparece no MTR (gerador ou transportador).
       <strong>Padrão</strong>: Direto = 1 MTR por viagem · Consolidador = 1 viagem junta vários MTRs (soma tem que fechar) ·
@@ -1143,7 +1085,7 @@
       </table>
     </div>
     <div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px">
-      <button class="btn-modal-cancel" onclick="concAddCadastro()">➕ Adicionar linha</button>
+      <button class="btn-modal-cancel" onclick="concAddCadastro()">+ Adicionar linha</button>
       <div style="display:flex;gap:8px">
         <button class="btn-modal-cancel" onclick="concFecharCadastro()">Cancelar</button>
         <button class="btn-modal-baixa" onclick="concSalvarCadastro()">Salvar cadastro</button>
@@ -1152,11 +1094,16 @@
   </div>
 </div>
 
-</div><!-- /.container -->
 
 <footer class="site-footer">
-  powered by <strong>vieir.ia</strong>
+  Inteligência MTR · powered by <strong>vieir.ia</strong>
 </footer>
+
+</div><!-- /.container -->
+    </div><!-- /.conteudo -->
+  </div><!-- /.main -->
+</div><!-- /.app -->
+
 
 <script>
   // ── Endpoints ────────────────────────────────────────────────────────────────
@@ -1221,7 +1168,7 @@
     const sel = document.getElementById('sistema-sel');
     if (!sel) return;
     sel.innerHTML = getPerfis().map(p => `<option value="${p.id}">${p.nome}</option>`).join('')
-      + '<option value="__novo__">➕ Adicionar acesso…</option>';
+      + '<option value="__novo__">+ Adicionar acesso…</option>';
     sel.value = sistemaAtivo();
   }
 
@@ -1236,6 +1183,7 @@
     localStorage.setItem('mtr_sistema', val);
     _atualizaBtnConfig();
     _atualizaConsultaInputs();
+    bnAtualizaLogin();
   }
 
   // FEAM consulta por período; SINIR/INEA consulta por número de MTR
@@ -1251,7 +1199,7 @@
     const btn = document.getElementById('btn-config');
     if (!btn) return;
     btn.classList.toggle('sem-auth', !ok);
-    btn.textContent = ok ? '⚙ Configurações' : '⚠ Configurar Acesso';
+    document.getElementById('btn-config-txt').textContent = ok ? 'Configurações' : 'Configurar acesso';
   }
 
   // Ajusta campos visíveis e URL padrão conforme o "Tipo de sistema" escolhido no modal
@@ -1559,12 +1507,25 @@
     });
   }
 
+  const TITULOS = {
+    emitir:   ['Emitir MTR', 'Emissão do manifesto no sistema selecionado.'],
+    baixa:    ['Baixa c/ número', 'Planilha com o número do MTR: o sistema busca cada um no órgão e dá baixa com o peso da balança.'],
+    conc:     ['Baixa s/ número', 'Relatório da balança sem o número: cruza gerador e data com os MTRs pendentes.'],
+    consulta: ['Consultar MTRs', 'MTRs pendentes de baixa no sistema selecionado.'],
+  };
   function switchTab(name, el) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('panel-' + name).classList.add('active');
     el.classList.add('active');
+    const [titulo, sub] = TITULOS[name] || ['', ''];
+    document.getElementById('page-titulo').textContent = titulo;
+    document.getElementById('page-sub').textContent = sub;
+    if (name === 'baixa') bnAtualizaLogin();
+    fecharMenu();
   }
+  function abrirMenu()  { document.getElementById('app').classList.add('menu-aberto'); }
+  function fecharMenu() { document.getElementById('app').classList.remove('menu-aberto'); }
 
   function val(id)         { return document.getElementById(id).value.trim(); }
   // Aceita decimal à brasileira ("0,24", "1.234,56"): sem isso, quantidade com
@@ -1740,9 +1701,9 @@
     const placa        = document.getElementById('m-placa').value.trim();
     const obs          = document.getElementById('m-obs').value.trim();
 
-    if (!dataReceb)   { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe a Data de Recebimento.</span>'; return; }
-    if (!responsavel) { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe o Nome do Responsável.</span>'; return; }
-    if (!cargo)       { document.getElementById('m-resp').innerHTML = '<span style="color:#c0392b">❌ Informe o Cargo do Responsável.</span>'; return; }
+    if (!dataReceb)   { document.getElementById('m-resp').innerHTML = '<span style="color:#DC2626">❌ Informe a Data de Recebimento.</span>'; return; }
+    if (!responsavel) { document.getElementById('m-resp').innerHTML = '<span style="color:#DC2626">❌ Informe o Nome do Responsável.</span>'; return; }
+    if (!cargo)       { document.getElementById('m-resp').innerHTML = '<span style="color:#DC2626">❌ Informe o Cargo do Responsável.</span>'; return; }
 
     const qtd = i => { const n = numBR(document.getElementById('m-qtd-' + i).value); return Number.isNaN(n) || n <= 0 ? (m.itens[i] || {}).quantidade : n; };
 
@@ -1811,7 +1772,7 @@
       const msg  = typeof body === 'string' ? body.trim() : (body.mensagem || JSON.stringify(body));
       const ok   = !msg.includes('❌');
       document.getElementById('m-resp').innerHTML =
-        `<span style="color:${ok ? '#276221' : '#c0392b'}">${msg}</span>`;
+        `<span style="color:${ok ? '#047857' : '#DC2626'}">${msg}</span>`;
       if (ok) {
         // Remove a linha da tabela após baixa com sucesso
         const row = document.querySelector(`tr[data-mtr="${m.manifestoCodigo}"]`);
@@ -1822,7 +1783,7 @@
       }
     } catch(err) {
       document.getElementById('m-resp').innerHTML =
-        `<span style="color:#c0392b">❌ ${err.message || 'Falha na requisição'}</span>`;
+        `<span style="color:#DC2626">❌ ${err.message || 'Falha na requisição'}</span>`;
     } finally {
       btn.disabled = false; btn.textContent = 'Confirmar Baixa';
     }
@@ -1893,85 +1854,360 @@
   function handleCSVUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-    document.getElementById('upload-label-text').textContent = `📄 ${file.name}`;
+    document.getElementById('upload-label-text').textContent = file.name;
+    document.getElementById('resp-massa').className = 'response-box';
+    bnPassos(1);
     const reader = new FileReader();
     const isXlsx = file.name.toLowerCase().endsWith('.xlsx');
-    reader.onload = e => {
-      if (isXlsx) {
-        const wb   = XLSX.read(e.target.result, { type: 'array' });
-        const ws   = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        _csvRows   = data.map(row => {
-          const out = {};
-          Object.entries(row).forEach(([k, v]) => out[k.trim()] = String(v ?? '').trim());
-          return out;
-        });
-      } else {
-        // Detecta encoding: UTF-8 (com ou sem BOM) → fallback Windows-1252
-        const bytes = new Uint8Array(e.target.result);
-        let text = new TextDecoder('utf-8').decode(bytes);
-        if (text.includes('�')) text = new TextDecoder('windows-1252').decode(bytes);
-        _csvRows = _parseCSV(text);
+    reader.onload = async e => {
+      try {
+        if (isXlsx) {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          // Planilha de pesagens (nº do MTR + peso + data): busca o resto no órgão.
+          const pesagens = bnLerPesagens(wb);
+          if (pesagens) { await bnImportar(pesagens); return; }
+          const ws   = wb.Sheets[wb.SheetNames[0]];
+          const data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          _csvRows   = data.map(row => {
+            const out = {};
+            Object.entries(row).forEach(([k, v]) => out[k.trim()] = String(v ?? '').trim());
+            return out;
+          });
+        } else {
+          // Detecta encoding: UTF-8 (com ou sem BOM) → fallback Windows-1252
+          const bytes = new Uint8Array(e.target.result);
+          let text = new TextDecoder('utf-8').decode(bytes);
+          if (text.includes('�')) text = new TextDecoder('windows-1252').decode(bytes);
+          _csvRows = _parseCSV(text);
+        }
+        if (!_csvRows.length) { showResponse('resp-massa', '❌ Arquivo vazio ou inválido.', true); return; }
+        _bnModo = false;
+        _renderCSVPreview();
+      } catch (err) {
+        showResponse('resp-massa', '❌ Falha ao ler a planilha: ' + err.message, true);
       }
-      if (!_csvRows.length) { alert('Arquivo vazio ou inválido.'); return; }
-      _renderCSVPreview();
     };
     reader.readAsArrayBuffer(file);
   }
 
+  // ── Baixa c/ número: planilha de pesagens ────────────────────────────────────
+  // A planilha traz só o que a balança sabe (nº do MTR, peso, placa, motorista,
+  // data). O resto (gerador, transportador, resíduo, situação) vem do órgão, MTR
+  // a MTR. O resultado é montado no MESMO formato da planilha exportada pelo
+  // sistema, então a conferência e o envio da baixa são os mesmos das outras
+  // entradas: um motor de baixa só.
+  //
+  // Travas (linha bloqueada não é enviada, e não dá para destravar na tela):
+  // número inválido ou repetido, peso ou data inválidos, MTR não encontrado no
+  // login ativo, MTR que não está "emitido" (recebido, cancelado, armazenamento
+  // temporário) e unidade que não é kg nem t.
+  let _bnModo = false;         // true quando a prévia veio da planilha de pesagens
+  const BN_LOTE = 30;          // números por chamada de consulta
+
+  const bnCanon = v => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const BN_COLS = {
+    mtr:   h => ['NDOMTR', 'NUMERODOMTR', 'NUMEROMTR', 'NOMTR', 'NMTR', 'MTR'].includes(h),
+    kg:    h => h.startsWith('PESOLIQUIDO'),
+    data:  h => ['DATADAPESAGEM', 'DATAPESAGEM', 'DATADEPESAGEM'].includes(h),
+    placa: h => h.startsWith('PLACA'),
+    mot:   h => h === 'MOTORISTA' || h === 'NOMEDOMOTORISTA',
+  };
+  const bnDtBR = iso => iso ? iso.split('-').reverse().join('/') : '';
+
+  function bnDataIso(v) {
+    if (v instanceof Date) return isNaN(v) ? '' : new Date(v.getTime() - v.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    // número de série do Excel (dias desde 30/12/1899)
+    if (typeof v === 'number') {
+      if (v < 20000 || v > 80000) return '';
+      return new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 86400000).toISOString().slice(0, 10);
+    }
+    return concIso(String(v ?? '').trim());
+  }
+
+  // Devolve as linhas da planilha de pesagens, ou null se o arquivo não for desse tipo.
+  function bnLerPesagens(wb) {
+    const aba  = wb.SheetNames.find(n => bnCanon(n) === 'MTR') || wb.SheetNames[0];
+    const grid = XLSX.utils.sheet_to_json(wb.Sheets[aba], { header: 1, defval: '', raw: true });
+    let hdr = -1, col = {}, emToneladas = false;
+    for (let i = 0; i < Math.min(grid.length, 20); i++) {
+      const h = (grid[i] || []).map(bnCanon);
+      const achou = {};
+      for (const k in BN_COLS) achou[k] = h.findIndex(BN_COLS[k]);
+      if (achou.mtr >= 0 && achou.kg >= 0 && achou.data >= 0) {
+        hdr = i; col = achou;
+        emToneladas = /^PESOLIQUIDO(T|TON|TONELADAS?)$/.test(h[achou.kg]);
+        break;
+      }
+    }
+    if (hdr < 0) return null;
+
+    const hoje = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const linhas = [], vistos = new Set();
+    for (let j = hdr + 1; j < grid.length; j++) {
+      const a = grid[j] || [];
+      const cel = k => (col[k] >= 0 ? a[col[k]] : '');
+      const bruto = String(cel('mtr') ?? '').trim();
+      const temOutros = ['placa', 'mot', 'data'].some(k => String(cel(k) ?? '').trim() !== '');
+      if (!bruto && !temOutros) continue;               // linha vazia ou de total
+      const num = bruto.replace(/^manifesto[_\s-]*/i, '').replace(/\D/g, '');
+      let kg = numBR(cel('kg'));
+      if (emToneladas) kg = Math.round(kg * 1e6) / 1000;
+      const dt = bnDataIso(cel('data'));
+      let erro = '';
+      if (!/^\d{10,13}$/.test(num))        erro = 'Número de MTR inválido na planilha';
+      else if (vistos.has(num))            erro = 'MTR repetido na planilha';
+      else if (!(kg > 0) || kg > 100000)   erro = 'Peso líquido inválido (em kg, até 100.000)';
+      else if (!dt)                        erro = 'Data da pesagem inválida';
+      else if (dt > hoje)                  erro = 'Data da pesagem no futuro';
+      if (/^\d{10,13}$/.test(num)) vistos.add(num);
+      linhas.push({
+        linha: j + 1, num: num || bruto, kg, dt, erro,
+        placa: concNorm(cel('placa')).replace(/[^A-Z0-9]/g, ''),
+        motorista: String(cel('mot') ?? '').trim(),
+      });
+    }
+    return linhas;
+  }
+
+  // 't' | 'kg' | '' (não conversível). Os códigos do SINIR são outros (3 = tonelada
+  // lá, kg no FEAM): no SINIR só vale a sigla que a API manda.
+  function bnUnidade(it, dialeto) {
+    const sigla = concNorm(it.unidadeSigla || '');
+    if (sigla) return /^T/.test(sigla) ? 't' : /KG|QUILO/.test(sigla) ? 'kg' : '';
+    if (dialeto === 'sinir') return '';
+    const u = Number(it.codigoUnidade);
+    return u === 4 ? 't' : u === 3 ? 'kg' : '';
+  }
+
+  // Divide `total` (inteiro) na proporção de `pesos`, pelo maior resto: a soma
+  // das partes fecha exatamente com o total.
+  function bnRateio(total, pesos) {
+    const soma  = pesos.reduce((t, p) => t + p, 0);
+    const exato = pesos.map(p => total * p / soma);
+    const parte = exato.map(Math.floor);
+    let resto   = total - parte.reduce((t, v) => t + v, 0);
+    const ordem = exato.map((v, i) => [v - Math.floor(v), i]).sort((x, y) => y[0] - x[0] || x[1] - y[1]);
+    for (let k = 0; resto > 0; k = (k + 1) % ordem.length, resto--) parte[ordem[k][1]]++;
+    return parte;
+  }
+
+  function bnLinhaBase(l, m) {
+    const cg = m ? concDig(m.cnpGerador) : '', ct = m ? concDig(m.cnpTransportador) : '';
+    return {
+      'Nº MTR': String(l.num || ''),
+      'Item': '',
+      'Data Emissão': m ? formatDate(m.manifDataExpedicao) : '',
+      'CNPJ Gerador': cg,
+      'Nome Gerador': m ? (m.nomeGerador || _nomeMap[cg] || cg) : '',
+      'CNPJ Transportador': ct,
+      'Nome Transportador': m ? (m.nomeTransportador || _nomeMap[ct] || ct) : '',
+      'Situação': m ? String(m.situacao || '') : '',
+      'Data de recebimento': bnDtBR(l.dt),
+      'Motorista': l.motorista || (m && m.nomeMotorista) || '',
+      'Placa': l.placa || (m && m.placaVeiculo) || '',
+      'Responsável pelo recebimento': 'Victoria Abrahão',
+      'Cargo': 'Analista ambiental',
+      'Qt. Indicada': '', 'Qt. Recebida': '', 'Unidade': '', 'Tecnologia': '',
+      'Justificativa': 'Peso apurado em balança',
+      'Resíduo': '', 'Cód. Estado Físico': '',
+      _linha: l.linha, _pesoKg: l.kg, _bloqueio: '', _aviso: '',
+    };
+  }
+  const bnBloqueada = (l, motivo, m) => ({ ...bnLinhaBase(l, m), _bloqueio: motivo });
+
+  // Uma linha por resíduo do MTR, com o peso da balança rateado entre eles.
+  function bnLinhasDoMtr(l, m, dialeto) {
+    const sit = String(m.situacao || '');
+    const pendente = dialeto === 'sinir'
+      ? !/receb|cancel|armaz|recus/i.test(sit)
+      : Number(m.situacaoManifestoCodigo) === 1;
+    if (!pendente) return [bnBloqueada(l, 'Não recebe baixa: ' + (sit || 'situação desconhecida'), m)];
+
+    const itens = m.itens || [];
+    if (!itens.length) return [bnBloqueada(l, 'MTR sem resíduo no órgão', m)];
+    const unid = itens.map(it => bnUnidade(it, dialeto));
+    if (unid.some(u => !u)) return [bnBloqueada(l, 'Unidade do MTR não é kg nem t: baixe à mão', m)];
+
+    // quantidade indicada de cada item em toneladas, para ratear e comparar
+    const indT = itens.map((it, k) => (Number(it.quantidade) || 0) / (unid[k] === 't' ? 1 : 1000));
+    const somaInd = indT.reduce((t, v) => t + v, 0);
+    // rateia em kg inteiros quando a balança manda kg inteiro; senão, em gramas
+    const passoG = Number.isInteger(l.kg) ? 1000 : 1;
+    const partes = bnRateio(Math.round(l.kg * 1000 / passoG), somaInd > 0 ? indT : itens.map(() => 1));
+    const dif = somaInd > 0 ? Math.abs(somaInd - l.kg / 1000) / (l.kg / 1000) : null;
+    const aviso = dif != null && dif > CONC_TOL_AMARELA
+      ? `Peso ${(dif * 100).toFixed(0)}% diferente do indicado: confira` : '';
+
+    return itens.map((it, k) => {
+      const gramas = partes[k] * passoG;
+      const qt = unid[k] === 't' ? gramas / 1e6 : gramas / 1000;
+      return { ...bnLinhaBase(l, m),
+        'Item': String(it.codigoSequencial ?? k + 1),
+        'Qt. Indicada': String(it.quantidade ?? ''),
+        'Qt. Recebida': String(+qt.toFixed(unid[k] === 't' ? 6 : 3)),
+        'Unidade': unid[k],
+        'Tecnologia': String(it.codigoTecnologia ?? ''),
+        'Resíduo': String(it.residuo ?? ''),
+        'Cód. Estado Físico': String(it.codigoTipoEstado ?? ''),
+        _aviso: aviso,
+      };
+    });
+  }
+
+  async function bnImportar(linhas) {
+    if (!linhas.length) { showResponse('resp-massa', '❌ Nenhuma pesagem encontrada na planilha.', true); return; }
+    if (!_camposObrigatorios().every(k => _cred()[k])) {
+      showResponse('resp-massa', `❌ Configure o acesso de ${perfilAtivo().nome} em Configurações antes de subir a planilha.`, true);
+      return;
+    }
+    const nums = linhas.filter(l => !l.erro).map(l => l.num);
+    const achados = new Map(), semResposta = new Set();
+    const wrap  = document.getElementById('massa-progress-wrap');
+    const fill  = document.getElementById('massa-progress-fill');
+    const label = document.getElementById('massa-progress-label');
+    document.getElementById('massa-preview').style.display = 'none';
+    wrap.style.display = 'block';
+
+    for (let i = 0; i < nums.length; i += BN_LOTE) {
+      fill.style.width = Math.round((i / nums.length) * 100) + '%';
+      label.textContent = `Buscando os MTRs em ${perfilAtivo().nome}… ${i}/${nums.length}`;
+      const lote = nums.slice(i, i + BN_LOTE);
+      try {
+        const j = await fetch(apiURL('consulta'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numeros: lote, ...getAuthPayload() }),
+        }).then(r => r.json());
+        // sem a lista de não encontrados, a consulta nem chegou a rodar (login, senha, API fora)
+        if (!j.sucesso && !Array.isArray(j.naoEncontrados)) {
+          wrap.style.display = 'none';
+          showResponse('resp-massa', j.mensagem || '❌ A consulta ao órgão falhou.', true);
+          return;
+        }
+        for (const m of (j.manifests || [])) achados.set(concDig(m.manifestoCodigo), m);
+        for (const n of (j.semResposta || [])) semResposta.add(String(n));
+      } catch (e) {
+        lote.forEach(n => semResposta.add(n));       // rede ou tempo esgotado: só este lote
+      }
+    }
+    wrap.style.display = 'none';
+
+    const dialeto = dialetoAtivo();
+    _csvRows = [];
+    for (const l of linhas) {
+      if (l.erro) { _csvRows.push(bnBloqueada(l, l.erro)); continue; }
+      const m = achados.get(l.num);
+      if (!m) {
+        _csvRows.push(bnBloqueada(l, semResposta.has(l.num)
+          ? 'O órgão não respondeu: suba a planilha de novo'
+          : `Não encontrado em ${perfilAtivo().nome}`));
+        continue;
+      }
+      _csvRows.push(...bnLinhasDoMtr(l, m, dialeto));
+    }
+    _bnModo = true;
+    _renderCSVPreview();
+
+    // nomes de gerador e transportador chegam depois, sem redesenhar a tabela
+    // (redesenhar apagaria o que o operador já tiver corrigido nas células)
+    const novos = await resolverNomes(_csvRows.flatMap(r => [r['CNPJ Gerador'], r['CNPJ Transportador']]));
+    if (!Object.keys(novos).length) return;
+    _csvRows.forEach((r, i) => {
+      for (const [campo, cnpj, id] of [['Nome Gerador', 'CNPJ Gerador', 'ger'], ['Nome Transportador', 'CNPJ Transportador', 'tr']]) {
+        const nome = novos[r[cnpj]];
+        if (!nome) continue;
+        r[campo] = nome;
+        const el = document.getElementById(`massa-${id}-${i}`);
+        if (el) { el.textContent = nome; el.title = nome; }
+      }
+    });
+  }
+
+  function bnAtualizaLogin() {
+    const el = document.getElementById('bn-login-nome');
+    if (el) el.textContent = perfilAtivo().nome;
+  }
+  function bnPassos(n) {
+    document.querySelectorAll('#bn-passos .passo').forEach(el =>
+      el.classList.toggle('feito', Number(el.dataset.p) <= n));
+  }
+
   function _renderCSVPreview() {
     const tbody = document.getElementById('massa-preview-tbody');
+    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     tbody.innerHTML = _csvRows.map((r, i) => {
-      const semData    = !r['Data de recebimento']?.trim();
+      const bloq       = r._bloqueio || '';
+      const semData    = !bloq && !r['Data de recebimento']?.trim();
       const nomeGer    = r['Nome Gerador']      || r['CNPJ Gerador']      || '—';
       const nomeTransp = r['Nome Transportador'] || r['CNPJ Transportador'] || '—';
-      const esc = s => String(s ?? '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-      return `<tr id="massa-row-${i}">
-        <td><strong>${_getMTR(r) || '—'}</strong></td>
-        <td style="font-size:.78rem;white-space:nowrap">${r['Data Emissão'] || '—'}</td>
-        <td style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeGer)}">${nomeGer}</td>
-        <td style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeTransp)}">${nomeTransp}</td>
+      const trava      = bloq ? ' disabled' : '';
+      const status     = bloq ? `<td class="status-err" id="massa-status-${i}">${esc(bloq)}</td>`
+                       : r._aviso ? `<td class="status-skip" id="massa-status-${i}">${esc(r._aviso)}</td>`
+                       : `<td class="status-wait" id="massa-status-${i}">—</td>`;
+      return `<tr id="massa-row-${i}"${bloq ? ' class="linha-bloqueada"' : ''}>
+        <td><strong>${esc(_getMTR(r)) || '—'}</strong></td>
+        ${status}
+        <td style="font-size:.78rem;white-space:nowrap">${esc(r['Data Emissão']) || '—'}</td>
+        <td id="massa-ger-${i}" style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeGer)}">${esc(nomeGer)}</td>
+        <td id="massa-tr-${i}" style="font-size:.76rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(nomeTransp)}">${esc(nomeTransp)}</td>
         <td class="${semData ? 'cell-warn' : ''}">
-          <input class="massa-input" id="input-${i}-dataReceb"
-                 value="${esc(r['Data de recebimento'])}" placeholder="${semData ? '⚠ preencher' : 'dd/mm/aaaa'}">
+          <input class="massa-input" id="input-${i}-dataReceb"${trava}
+                 value="${esc(r['Data de recebimento'])}" placeholder="${semData ? 'preencher' : 'dd/mm/aaaa'}">
         </td>
-        <td><input class="massa-input" id="input-${i}-motorista"
+        <td><input class="massa-input" id="input-${i}-motorista"${trava}
                    value="${esc(r['Motorista'])}" placeholder="Motorista"></td>
-        <td><input class="massa-input" id="input-${i}-placa" style="width:72px"
+        <td><input class="massa-input" id="input-${i}-placa" style="width:72px"${trava}
                    value="${esc(r['Placa'])}" placeholder="Placa"></td>
-        <td style="text-align:right;color:#718096;font-size:.8rem;white-space:nowrap">
-          ${r['Qt. Indicada'] || '—'} ${r['Unidade'] || ''}</td>
-        <td><input class="massa-input" id="input-${i}-qtReceb" style="width:68px;text-align:right"
+        <td style="text-align:right;color:#6B7280;font-size:.8rem;white-space:nowrap">
+          ${esc(r['Qt. Indicada']) || '—'} ${esc(r['Unidade'])}</td>
+        <td><input class="massa-input" id="input-${i}-qtReceb" style="width:68px;text-align:right"${trava}
                    value="${esc(r['Qt. Recebida'])}" placeholder="—"></td>
-        <td><input class="massa-input" id="input-${i}-justif" style="min-width:150px"
+        <td><input class="massa-input" id="input-${i}-justif" style="min-width:150px"${trava}
                    value="${esc(r['Justificativa'])}" placeholder="Justificativa"></td>
-        <td><input class="massa-input" id="input-${i}-residuo" style="width:72px"
+        <td><input class="massa-input" id="input-${i}-residuo" style="width:72px"${trava}
                    value="${esc(r['Resíduo'] || r['Residuo'])}" placeholder="Cód."></td>
-        <td class="status-wait" id="massa-status-${i}">—</td>
       </tr>`;
     }).join('');
 
-    const total   = _csvRows.length;
-    const semData = _csvRows.filter(r => !r['Data de recebimento']?.trim()).length;
+    const livres   = _csvRows.filter(r => !r._bloqueio && _getMTR(r));
+    const prontos  = new Set(livres.filter(r => r['Data de recebimento']?.trim()).map(_getMTR)).size;
+    const semData  = new Set(livres.filter(r => !r['Data de recebimento']?.trim()).map(_getMTR)).size;
+    const travados = _csvRows.filter(r => r._bloqueio).length;
+    const avisos   = new Set(livres.filter(r => r._aviso).map(_getMTR)).size;
+
+    const chips = [`<span class="chip chip-ok">${prontos} pronto${prontos !== 1 ? 's' : ''} para baixa</span>`];
+    if (semData)  chips.push(`<span class="chip chip-warn">${semData} sem data (serão pulados)</span>`);
+    if (avisos)   chips.push(`<span class="chip chip-warn">${avisos} com peso para conferir</span>`);
+    if (travados) chips.push(`<span class="chip chip-err">${travados} bloqueado${travados !== 1 ? 's' : ''}</span>`);
+    if (_bnModo) {
+      const kg = [...new Map(livres.map(r => [_getMTR(r), r._pesoKg || 0])).values()].reduce((t, v) => t + v, 0);
+      chips.push(`<span class="chip">${(kg / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} t na balança</span>`);
+    }
+    document.getElementById('massa-chips').innerHTML = chips.join('');
     document.getElementById('massa-count').textContent =
-      `${total} registro(s)` + (semData ? ` — ⚠ ${semData} sem data de recebimento` : ' — revise e clique em Processar');
+      `${_csvRows.length} linha(s) · baixa pelo login ${perfilAtivo().nome}`;
     document.getElementById('massa-preview').style.display = 'block';
     document.getElementById('massa-progress-wrap').style.display = 'none';
-    document.getElementById('btn-massa').disabled = false;
-    document.getElementById('btn-massa').textContent = '▶ Processar Baixas';
+    document.getElementById('btn-massa').disabled = !livres.length;
+    document.getElementById('btn-massa').textContent = 'Dar baixa';
+    bnPassos(2);
   }
 
   function limparCSV() {
     _csvRows = [];
+    _bnModo = false;
     document.getElementById('csv-massa-input').value = '';
-    document.getElementById('upload-label-text').textContent = '📂 Clique ou arraste o arquivo CSV aqui';
+    document.getElementById('upload-label-text').textContent = 'Clique ou arraste a planilha aqui';
+    document.getElementById('resp-massa').className = 'response-box';
     document.getElementById('massa-preview').style.display = 'none';
     document.getElementById('massa-progress-wrap').style.display = 'none';
+    bnPassos(0);
   }
 
   async function processarBaixasMassa() {
-    const rows = _csvRows.filter(r => _getMTR(r));
-    if (!rows.length) return;
+    // bloqueada = travada na conferência; _feito = já baixada nesta sessão
+    const rows = _csvRows.filter(r => _getMTR(r) && !r._bloqueio && !r._feito);
+    if (!rows.length) { alert('Nenhum MTR para baixar.'); return; }
 
     // MTR com mais de um resíduo ocupa uma linha por resíduo na planilha —
     // agrupa pelo número para mandar UMA baixa com todos os itens (o órgão
@@ -1989,7 +2225,12 @@
     // não precisa saber qual linha do MTR "conta"
     const leGrupo = (g, campo) => g.idxs.map(idx => leDom(idx, campo)).find(Boolean) || '';
     const semData = grupos.filter(g => !leGrupo(g, 'dataReceb')).length;
-    if (semData && !confirm(`${semData} MTR(s) sem Data de Recebimento serão pulados. Continuar?`)) return;
+    const aEnviar = grupos.length - semData;
+    if (!aEnviar) { alert('Nenhum MTR com Data de Recebimento preenchida.'); return; }
+    // A baixa é feita no órgão e este sistema não desfaz: confirma sempre.
+    if (!confirm(`Dar baixa em ${aEnviar} MTR(s) pelo login "${perfilAtivo().nome}"?`
+        + (semData ? `\n${semData} sem Data de Recebimento serão pulados.` : '')
+        + '\n\nA baixa é registrada no órgão e não pode ser desfeita por aqui.')) return;
 
     const btn = document.getElementById('btn-massa');
     btn.disabled = true; btn.textContent = 'Processando…';
@@ -2080,8 +2321,8 @@
         const msg  = typeof body === 'string' ? body.trim() : (body.mensagem || JSON.stringify(body));
         const isOk   = !msg.includes('❌');
         const errMsg = msg.replace(/^[❌\s]+/, '').slice(0, 80);
-        marca(isOk ? 'status-ok' : 'status-err', isOk ? '✅ OK' : `❌ ${errMsg}`);
-        if (isOk) ok++; else err++;
+        marca(isOk ? 'status-ok' : 'status-err', isOk ? '✅ Baixado' : `❌ ${errMsg}`);
+        if (isOk) { ok++; concMarcaBaixado(g.mtr); g.idxs.forEach(idx => { _csvRows[idx]._feito = true; }); } else err++;
       } catch(e) {
         marca('status-err', `❌ ${e.message}`);
         err++;
@@ -2091,7 +2332,8 @@
     fill.style.width = '100%';
     label.textContent =
       `Concluído — ✅ ${ok} sucesso   ❌ ${err} erro${err !== 1 ? 's' : ''}   ⏭ ${skip} pulado${skip !== 1 ? 's' : ''}`;
-    btn.disabled = false; btn.textContent = '▶ Processar Baixas';
+    btn.disabled = false; btn.textContent = 'Dar baixa';
+    bnPassos(3);
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2262,11 +2504,11 @@
         <td><strong>${codigo}</strong></td>
         <td>${dataEmis}</td>
         <td>
-          <span style="font-size:.72rem;color:#718096;font-family:monospace">${cnpjGer}</span><br>
+          <span style="font-size:.72rem;color:#6B7280;font-family:monospace">${cnpjGer}</span><br>
           <strong style="font-size:.82rem" data-cnpj="${cnpjGer}">${nomeGer}</strong>
         </td>
         <td>
-          <span style="font-size:.72rem;color:#718096;font-family:monospace">${cnpjTransp}</span><br>
+          <span style="font-size:.72rem;color:#6B7280;font-family:monospace">${cnpjTransp}</span><br>
           <strong style="font-size:.82rem" data-cnpj="${cnpjTransp}">${nomeTransp}</strong>
         </td>
         <td>${situacao}</td>
@@ -2367,7 +2609,7 @@
 
   async function submitConsulta() {
     if (!_camposObrigatorios().every(k => _cred()[k])) {
-      showResponse('resp-consulta', `❌ Configure o acesso de ${perfilAtivo().nome} em ⚙ Configurações antes de consultar.`, true); return;
+      showResponse('resp-consulta', `❌ Configure o acesso de ${perfilAtivo().nome} em Configurações antes de consultar.`, true); return;
     }
 
     // Monta o corpo conforme o dialeto: FEAM = período, SINIR/INEA = lista de números
@@ -2510,7 +2752,9 @@
   // ── Conciliação Balança ──────────────────────────────────────────────────────
   // Cruza o relatório de pesagens da balança com os MTRs pendentes dos sistemas.
   // Três padrões de casamento, definidos no cadastro de cada gerador:
-  //   direto       → 1 MTR por viagem, emitido no dia da pesagem ou na véspera
+  //   direto       → 1 MTR por viagem, emitido no dia da pesagem ou na véspera;
+  //                  sem nenhum nesses dois dias, vale o de data mais próxima
+  //                  dentro da janela (proposta sai amarela, para conferir)
   //   consolidador → 1 viagem junta vários MTRs (dia/véspera); a soma tem que fechar
   //   lote         → MTRs emitidos em bloco (prefeituras); casamento por ordem
   //                  cronológica, juntando MTRs até a soma aproximar do peso
@@ -2519,6 +2763,19 @@
 
   const CONC_TOL_VERDE   = 0.10;   // soma fecha
   const CONC_TOL_AMARELA = 0.30;   // olhar antes de aprovar
+  // Janela do padrão direto: até quantos dias antes da pesagem o MTR pode ter
+  // sido emitido. A busca no órgão começa 20 dias antes da primeira pesagem,
+  // então 20 é o teto.
+  const CONC_JANELA_PADRAO = 7, CONC_JANELA_MAX = 20;
+  function concJanela() {
+    const n = parseInt(document.getElementById('conc-janela')?.value, 10);
+    return Number.isFinite(n) ? Math.min(CONC_JANELA_MAX, Math.max(1, n)) : CONC_JANELA_PADRAO;
+  }
+  function concSalvarJanela() {
+    const n = concJanela();
+    document.getElementById('conc-janela').value = n;
+    localStorage.setItem('mtr_conc_janela', String(n));
+  }
   const CONC_SEED = [
     ['CIMVALPI - SAO PEDRO DOS FERROS','19243500000182','gerador','lote','bituruna'],
     ['CIMVALPI - SANTA CRUZ ESCALVADO','18316273000105','gerador','lote','bituruna'],
@@ -2577,6 +2834,9 @@
   const CONC_SLOTS = ['leopoldina', 'bituruna', 'sinir', 'inea'];
 
   function concInit() {
+    const janela = parseInt(localStorage.getItem('mtr_conc_janela'), 10);
+    const campoJanela = document.getElementById('conc-janela');
+    if (campoJanela && Number.isFinite(janela)) campoJanela.value = Math.min(CONC_JANELA_MAX, Math.max(1, janela));
     const salvo = JSON.parse(localStorage.getItem('mtr_conc_logins') || '{}');
     const perfis = getPerfis();
     for (const slot of CONC_SLOTS) {
@@ -2694,7 +2954,7 @@
     for (const slot of ['leopoldina', 'bituruna']) {
       if (!logins[slot]) { avisos.push(`Login de ${slot} não configurado — pesagens desse aterro ficarão sem par.`); continue; }
       const a = concAuthDe(logins[slot]);
-      if (!a.ok) { avisos.push(`Credenciais incompletas em "${a.nome}" — configure em ⚙ Configurações.`); continue; }
+      if (!a.ok) { avisos.push(`Credenciais incompletas em "${a.nome}" — configure em Configurações.`); continue; }
       buscas.push((async () => {
         const todos = [], msgs = [];
         for (const [de, ate] of janelas) {
@@ -2759,7 +3019,7 @@
     }
     if (jaBaixados) avisos.push(`${jaBaixados} MTR(s) ignorado(s): já baixados por aqui anteriormente.`);
 
-    _concResultado = concConciliar(_concPesagens, manifests, concCadastro());
+    _concResultado = concConciliar(_concPesagens, manifests, concCadastro(), concJanela());
     _concResultado.armaz = armaz;
     _concResultado.avisos = avisos;
     concRender();
@@ -2787,7 +3047,7 @@
   }
 
   // ── motor ──
-  function concConciliar(pesagens, manifests, cadastro) {
+  function concConciliar(pesagens, manifests, cadastro, janela = 1) {
     const porNome = {};
     for (const c of cadastro) if (c.nome) porNome[concNorm(c.nome)] = c;
 
@@ -2806,7 +3066,7 @@
     const grupos = new Map();
     for (const p of todas) {
       if (!p.cad || !concDig(p.cad.cnpj)) {
-        res.semPar.push({ p, motivo: p.cad ? 'Cadastro sem CNPJ — preencha em ⚙ Cadastro' : 'Gerador não cadastrado — adicione em ⚙ Cadastro' });
+        res.semPar.push({ p, motivo: p.cad ? 'Cadastro sem CNPJ — preencha em Cadastro de geradores' : 'Gerador não cadastrado — adicione em Cadastro de geradores' });
         continue;
       }
       const k = p.cad.nome;
@@ -2814,15 +3074,19 @@
       grupos.get(k).pes.push(p);
     }
 
-    const propor = (p, mtrs) => {
+    // dias = distância entre a emissão do MTR e a pesagem (só no padrão direto)
+    const propor = (p, mtrs, dias = 0) => {
       const soma = mtrs.reduce((s, m) => s + (m.t ?? 0), 0);
       const semUnidade = mtrs.some(m => m.t == null);
       const dif = (!semUnidade && soma > 0) ? Math.abs(soma - p.t) / p.t : null;
-      const cor = semUnidade || dif == null ? 'vermelha'
-                : dif <= CONC_TOL_VERDE ? 'verde'
-                : dif <= CONC_TOL_AMARELA ? 'amarela' : 'vermelha';
+      let cor = semUnidade || dif == null ? 'vermelha'
+              : dif <= CONC_TOL_VERDE ? 'verde'
+              : dif <= CONC_TOL_AMARELA ? 'amarela' : 'vermelha';
+      // casou fora do dia/véspera: nunca sai verde, mesmo com o peso fechando
+      if (dias > 1 && cor === 'verde') cor = 'amarela';
       mtrs.forEach(m => m.usado = true);
-      res.propostas.push({ p, mtrs, soma, dif, cor, semUnidade, checked: cor !== 'vermelha' });
+      // e sai desmarcada: casamento por janela é mais fraco, o operador marca
+      res.propostas.push({ p, mtrs, soma, dif, cor, semUnidade, dias, checked: cor !== 'vermelha' && !(dias > 1) });
     };
 
     for (const { cad, pes } of grupos.values()) {
@@ -2841,16 +3105,27 @@
         }
       } else {
         for (const p of pes) {
-          const cands = candidatos(p, cad).filter(m => {
-            const d = concDifDias(p.dt, m.dt);
-            return d >= 0 && d <= 1;                    // emitido no dia ou na véspera
-          });
-          if (!cands.length) { res.semPar.push({ p, motivo: 'Nenhum MTR pendente do CNPJ no dia/véspera' }); continue; }
-          if (cad.padrao === 'consolidador') propor(p, cands);
-          else {
+          // só MTR emitido até a data da pesagem
+          const todos = candidatos(p, cad)
+            .map(m => ({ m, d: concDifDias(p.dt, m.dt) })).filter(x => x.d >= 0);
+          const perto = todos.filter(x => x.d <= 1);    // emitido no dia ou na véspera
+          const pesoMaisProximo = (a, b) => Math.abs((a.m.t ?? 1e9) - p.t) - Math.abs((b.m.t ?? 1e9) - p.t);
+
+          if (cad.padrao === 'consolidador') {
+            if (!perto.length) { res.semPar.push({ p, motivo: 'Nenhum MTR pendente do CNPJ no dia/véspera' }); continue; }
+            propor(p, perto.map(x => x.m));
+          } else if (perto.length) {
             // direto: 1 candidato casa; vários → o de peso mais próximo
-            const ord = cands.slice().sort((a, b) => Math.abs((a.t ?? 1e9) - p.t) - Math.abs((b.t ?? 1e9) - p.t));
-            propor(p, [ord[0]]);
+            propor(p, [perto.slice().sort(pesoMaisProximo)[0].m]);
+          } else {
+            // nada no dia/véspera: o de data mais próxima dentro da janela
+            // (empate na data → peso mais próximo)
+            const naJanela = todos.filter(x => x.d <= janela).sort((a, b) => a.d - b.d || pesoMaisProximo(a, b));
+            if (!naJanela.length) {
+              res.semPar.push({ p, motivo: `Nenhum MTR pendente do CNPJ até ${janela} dia(s) antes da pesagem` });
+              continue;
+            }
+            propor(p, [naJanela[0].m], naJanela[0].d);
           }
         }
       }
@@ -2869,18 +3144,19 @@
     const nVerm  = r.propostas.filter(x => x.cor === 'vermelha').length;
     document.getElementById('conc-resumo').innerHTML =
       `<strong>${r.propostas.length}</strong> proposta(s) — ` +
-      `<span style="color:#276221">${nVerde} fecham</span> · ` +
-      `<span style="color:#b45309">${nAmar} próximas</span> · ` +
-      `<span style="color:#c0392b">${nVerm} divergem</span> · ` +
+      `<span style="color:#047857">${nVerde} fecham</span> · ` +
+      `<span style="color:#B45309">${nAmar} próximas</span> · ` +
+      `<span style="color:#DC2626">${nVerm} divergem</span> · ` +
       `${r.semPar.length} pesagem(ns) sem par · ${r.sobra.length} MTR(s) sem pesagem · ${r.armaz.length} em armaz. temporário` +
-      (r.avisos.length ? `<br><span style="color:#b45309">⚠ ${r.avisos.join(' · ')}</span>` : '');
+      (r.avisos.length ? `<br><span style="color:#B45309">⚠ ${r.avisos.join(' · ')}</span>` : '');
 
-    const CHIP = { verde: ['#276221', 'fecha'], amarela: ['#b45309', 'próximo'], vermelha: ['#c0392b', 'diverge'] };
+    const CHIP = { verde: ['#047857', 'fecha'], amarela: ['#B45309', 'próximo'], vermelha: ['#DC2626', 'diverge'] };
     const tb = document.getElementById('conc-tbody-propostas');
     tb.innerHTML = r.propostas.map((x, i) => {
-      const [cor, rot] = CHIP[x.cor];
-      const mtrsHtml = x.mtrs.map(m => `<div style="white-space:nowrap"><strong>${m.num}</strong> <span style="color:#718096;font-size:.75rem">${m.dt.split('-').reverse().join('/')}</span></div>`).join('');
-      const indHtml = x.semUnidade ? '<span style="color:#c0392b">unid.?</span>'
+      const [cor, rotCor] = CHIP[x.cor];
+      const rot = x.dias > 1 ? `${rotCor} · MTR de ${x.dias} dias antes` : rotCor;
+      const mtrsHtml = x.mtrs.map(m => `<div style="white-space:nowrap"><strong>${m.num}</strong> <span style="color:#6B7280;font-size:.75rem">${m.dt.split('-').reverse().join('/')}</span></div>`).join('');
+      const indHtml = x.semUnidade ? '<span style="color:#DC2626">unid.?</span>'
         : x.mtrs.map(m => `<div>${(m.t ?? 0).toFixed(3)}</div>`).join('');
       return `<tr>
         <td><input type="checkbox" id="conc-ck-${i}" ${x.checked ? 'checked' : ''}></td>
@@ -2889,7 +3165,7 @@
         <td style="font-size:.8rem">${x.p.gerLabel}</td>
         <td><strong>${x.p.t.toFixed(3)}</strong></td>
         <td>${mtrsHtml}</td>
-        <td style="font-size:.8rem">${indHtml}${x.mtrs.length > 1 ? `<div style="border-top:1px solid #e2e8f0;margin-top:2px">Σ ${x.soma.toFixed(3)}</div>` : ''}</td>
+        <td style="font-size:.8rem">${indHtml}${x.mtrs.length > 1 ? `<div style="border-top:1px solid #EBEBEA;margin-top:2px">Σ ${x.soma.toFixed(3)}</div>` : ''}</td>
         <td style="color:${cor};font-weight:700">${x.dif == null ? '—' : (x.dif * 100).toFixed(1) + '%'}</td>
         <td><span class="status-wait" id="conc-st-${i}" style="color:${cor}">${rot}</span></td>
       </tr>`;
@@ -2897,7 +3173,7 @@
     document.getElementById('conc-sec-propostas').style.display = r.propostas.length ? 'block' : 'none';
 
     document.getElementById('conc-tbody-sempar').innerHTML = r.semPar.map(({ p, motivo }) =>
-      `<tr><td>${p.n || '—'}</td><td>${p.dt.split('-').reverse().join('/')}</td><td style="font-size:.8rem">${p.gerLabel}</td><td>${p.t.toFixed(3)}</td><td style="font-size:.8rem;color:#b45309">${motivo}</td></tr>`).join('');
+      `<tr><td>${p.n || '—'}</td><td>${p.dt.split('-').reverse().join('/')}</td><td style="font-size:.8rem">${p.gerLabel}</td><td>${p.t.toFixed(3)}</td><td style="font-size:.8rem;color:#B45309">${motivo}</td></tr>`).join('');
     document.getElementById('conc-sec-sempar').style.display = r.semPar.length ? 'block' : 'none';
 
     document.getElementById('conc-tbody-sobra').innerHTML = r.sobra.map(m =>
@@ -3003,9 +3279,9 @@
     };
 
     for (const x of r.propostas) {
-      const aprovada = x.cor !== 'vermelha';
+      const aprovada = x.cor !== 'vermelha' && !(x.dias > 1);
       const status = x.cor === 'verde' ? `✓ fecha (${(x.dif*100).toFixed(1)}%)`
-                   : x.cor === 'amarela' ? `~ próximo (${(x.dif*100).toFixed(1)}%)`
+                   : x.cor === 'amarela' ? `~ próximo (${(x.dif*100).toFixed(1)}%)` + (x.dias > 1 ? ` — MTR emitido ${x.dias} dias antes da pesagem: confira e preencha a data` : '')
                    : `✗ diverge${x.dif != null ? ` (${(x.dif*100).toFixed(0)}%)` : ''} — confira e preencha a data`;
       for (const m of x.mtrs) {
         const fatiaT = x.mtrs.length === 1 ? x.p.t
@@ -3133,15 +3409,15 @@
   function concAddCadastro(e) {
     e = e && e.nome !== undefined ? e : { nome: '', cnpj: '', papel: 'gerador', padrao: 'direto', sistema: 'leopoldina' };
     const tr = document.createElement('tr');
-    const sel = (opts, val) => `<select style="width:100%;padding:5px;border:1px solid #cbd5e0;border-radius:6px;font-size:.8rem">`
+    const sel = (opts, val) => `<select style="width:100%;padding:5px;border:1px solid #E5E7EB;border-radius:6px;font-size:.8rem">`
       + opts.map(([v, l]) => `<option value="${v}" ${v === val ? 'selected' : ''}>${l}</option>`).join('') + '</select>';
     tr.innerHTML = `
-      <td><input type="text" value="${e.nome.replace(/"/g, '&quot;')}" style="width:100%;padding:5px;border:1px solid #cbd5e0;border-radius:6px;font-size:.8rem"></td>
-      <td><input type="text" value="${e.cnpj}" placeholder="só números" maxlength="14" style="width:130px;padding:5px;border:1px solid #cbd5e0;border-radius:6px;font-size:.8rem;font-family:monospace"></td>
+      <td><input type="text" value="${e.nome.replace(/"/g, '&quot;')}" style="width:100%;padding:5px;border:1px solid #E5E7EB;border-radius:6px;font-size:.8rem"></td>
+      <td><input type="text" value="${e.cnpj}" placeholder="só números" maxlength="14" style="width:130px;padding:5px;border:1px solid #E5E7EB;border-radius:6px;font-size:.8rem;font-family:monospace"></td>
       <td>${sel([['gerador','Gerador'],['transportador','Transportador']], e.papel)}</td>
       <td>${sel([['direto','Direto'],['consolidador','Consolidador'],['lote','Lote']], e.padrao)}</td>
       <td>${sel([['leopoldina','FEAM Leopoldina'],['bituruna','FEAM Bituruna'],['sinir','SINIR'],['inea','INEA-RJ']], e.sistema)}</td>
-      <td><button class="btn-modal-cancel" style="padding:4px 8px;color:#c0392b" onclick="this.closest('tr').remove()">✕</button></td>`;
+      <td><button class="btn-modal-cancel" style="padding:4px 8px;color:#DC2626" onclick="this.closest('tr').remove()">✕</button></td>`;
     document.getElementById('cad-tbody').appendChild(tr);
   }
   function concSalvarCadastro() {

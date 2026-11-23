@@ -3,6 +3,10 @@
 //
 // Os dois dialetos devolvem o MESMO formato ({ manifests: [...] }, campos estilo
 // FEAM), para a mesma tabela da tela servir aos dois.
+//
+// Com `numeros` no corpo, a consulta é POR NÚMERO nos dois dialetos e devolve o
+// MTR em qualquer situação (emitido, recebido, cancelado…), mais a lista dos que
+// não vieram: é o que a Baixa c/ número usa para conferir antes de baixar.
 import {
   MtrError, apiFetch, validarApiBase,
   getTokenFeam, headersFeam, getTokenSinir, headersSinir,
@@ -12,6 +16,9 @@ import {
 // A consulta do FEAM faz uma requisição por manifesto do período; em lotes para
 // não abrir dezenas de conexões simultâneas contra a API do órgão.
 const LOTE = 6;
+// Teto da busca por número: cabe folgado nos 60 s da função (6 por vez).
+const MAX_NUMEROS = 60;
+const SEM_RESPOSTA = Symbol('sem-resposta');
 
 const SITUACOES = {
   1: 'Emitido (aguarda baixa)',
@@ -43,6 +50,8 @@ const vazio = mensagem => ({ sucesso: false, total: 0, totalPendentes: 0, manife
 // ── API antiga (FEAM-MG): lista por período ──────────────────────────────────
 
 async function consultaFeam(apiBase, form) {
+  if (Array.isArray(form.numeros)) return consultaFeamPorNumero(apiBase, form);
+
   const inicio = soDigitos(form.dataInicio);
   const fim    = soDigitos(form.dataFim);
   if (inicio.length !== 8 || fim.length !== 8) {
@@ -70,25 +79,7 @@ async function consultaFeam(apiBase, form) {
   const todos = buscados.filter(m => m && typeof m === 'object' && m.manifestoCodigo !== undefined);
   const manifests = todos
     .filter(m => m.situacaoManifestoCodigo === 1)      // 1 = emitido, aguardando baixa
-    .map(m => ({
-      manifestoCodigo:    m.manifestoCodigo,
-      manifDataExpedicao: m.manifDataExpedicao || m.manifData,
-      cnpGerador:         m.cnpGerador,
-      cnpTransportador:   m.cnpTransportador,
-      cnpDestinador:      m.cnpDestinador,
-      nomeMotorista:      m.manifTransportadorNomeMotorista || '',
-      placaVeiculo:       m.manifTransportadorPlacaVeiculo  || '',
-      situacaoManifestoCodigo: m.situacaoManifestoCodigo,
-      situacao: SITUACOES[m.situacaoManifestoCodigo] || `Situação ${m.situacaoManifestoCodigo}`,
-      itens: (m.itemManifestoJSONs || []).map(it => ({
-        codigoSequencial: it.codigoSequencial,
-        residuo:          it.residuo,
-        quantidade:       it.quantidade,
-        codigoUnidade:    it.codigoUnidade,
-        codigoTecnologia: it.codigoTecnologia,
-        codigoTipoEstado: it.codigoTipoEstado,
-      })),
-    }));
+    .map(normalizaManifestoFeam);
 
   return {
     sucesso: true,
@@ -96,6 +87,70 @@ async function consultaFeam(apiBase, form) {
     totalPendentes: manifests.length,
     manifests,
     mensagem: `✅ ${manifests.length} MTR(s) pendente(s) de baixa (de ${todos.length} no período)`,
+  };
+}
+
+// Traduz o manifesto da API antiga para os campos que a tela usa.
+function normalizaManifestoFeam(m) {
+  return {
+    manifestoCodigo:    m.manifestoCodigo,
+    manifDataExpedicao: m.manifDataExpedicao || m.manifData,
+    cnpGerador:         m.cnpGerador,
+    cnpTransportador:   m.cnpTransportador,
+    cnpDestinador:      m.cnpDestinador,
+    nomeMotorista:      m.manifTransportadorNomeMotorista || '',
+    placaVeiculo:       m.manifTransportadorPlacaVeiculo  || '',
+    situacaoManifestoCodigo: m.situacaoManifestoCodigo,
+    situacao: SITUACOES[m.situacaoManifestoCodigo] || `Situação ${m.situacaoManifestoCodigo}`,
+    itens: (m.itemManifestoJSONs || []).map(it => ({
+      codigoSequencial: it.codigoSequencial,
+      residuo:          it.residuo,
+      quantidade:       it.quantidade,
+      codigoUnidade:    it.codigoUnidade,
+      codigoTecnologia: it.codigoTecnologia,
+      codigoTipoEstado: it.codigoTipoEstado,
+    })),
+  };
+}
+
+// Busca por número (API antiga). Devolve o MTR em qualquer situação — quem
+// decide se dá para baixar é a tela. Uma falha isolada (timeout de um número)
+// não derruba o lote: o número volta em `semResposta` para nova tentativa.
+async function consultaFeamPorNumero(apiBase, form) {
+  const numeros = [...new Set((form.numeros || []).map(soDigitos).filter(Boolean))];
+  if (!numeros.length) return vazio('❌ Nenhum número de MTR informado.');
+  if (numeros.length > MAX_NUMEROS) {
+    return vazio(`❌ Máximo de ${MAX_NUMEROS} números por consulta (vieram ${numeros.length}).`);
+  }
+
+  const auth = await getTokenFeam(apiBase, form.auth || {});
+  const headers = headersFeam(auth);
+
+  const respostas = await emLotes(numeros, LOTE, num =>
+    apiFetch(`${apiBase}/retornaManifestoPorNumero/${encodeURIComponent(num)}`, { headers })
+      .catch(() => SEM_RESPOSTA)
+  );
+
+  const manifests = [], naoEncontrados = [], semResposta = [];
+  respostas.forEach((m, i) => {
+    if (m === SEM_RESPOSTA) semResposta.push(numeros[i]);
+    else if (m && typeof m === 'object' && m.manifestoCodigo !== undefined) manifests.push(normalizaManifestoFeam(m));
+    else naoEncontrados.push(numeros[i]);
+  });
+
+  return respostaPorNumero(manifests, naoEncontrados, semResposta);
+}
+
+function respostaPorNumero(manifests, naoEncontrados, semResposta) {
+  const partes = [`${manifests.length} MTR(s) carregado(s)`];
+  if (naoEncontrados.length) partes.push(`${naoEncontrados.length} não encontrado(s)`);
+  if (semResposta.length)    partes.push(`${semResposta.length} sem resposta do órgão`);
+  return {
+    sucesso: true,
+    total: manifests.length,
+    totalPendentes: manifests.filter(m => Number(m.situacaoManifestoCodigo) === 1).length,
+    manifests, naoEncontrados, semResposta,
+    mensagem: (manifests.length ? '✅ ' : '❌ ') + partes.join(' — '),
   };
 }
 
@@ -118,23 +173,23 @@ async function consultaSinir(apiBase, form) {
     apiFetch(`${apiBase}/retornaManifesto/${encodeURIComponent(num)}`, { method: 'GET', headers })
   );
 
-  const manifests = [];
+  const manifests = [], naoEncontrados = [];
   let falhas = 0;
-  for (const resposta of respostas) {
+  respostas.forEach((resposta, i) => {
     const m = resposta?.objetoResposta;
-    if (!m || !m.manNumero) { falhas++; continue; }
+    if (!m || !m.manNumero) { falhas++; naoEncontrados.push(numeros[i]); return; }
     manifests.push(normalizaManifestoSinir(m));
-  }
+  });
 
   if (!manifests.length) {
-    return vazio(`❌ Nenhum MTR encontrado (${falhas} número(s) não retornaram dados). Confira os números.`);
+    return { ...vazio(`❌ Nenhum MTR encontrado (${falhas} número(s) não retornaram dados). Confira os números.`), naoEncontrados };
   }
 
   return {
     sucesso: true,
     total: manifests.length,
     totalPendentes: manifests.length,
-    manifests,
+    manifests, naoEncontrados,
     mensagem: `✅ ${manifests.length} MTR(s) carregado(s)` + (falhas ? ` — ${falhas} não encontrado(s)` : ''),
   };
 }
