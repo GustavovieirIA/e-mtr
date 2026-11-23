@@ -399,6 +399,8 @@
     }
     .passo.feito { background: var(--amber-soft); color: var(--amber-ink); }
     .passo.feito b { background: var(--amber); color: var(--ink); }
+    .aviso-login { font-size: .84rem; line-height: 1.5; margin: -4px 0 14px; padding: 10px 14px; border-radius: 10px;
+                   background: var(--amber-soft); color: #854D0E; border: 1px solid #FDE68A; }
     .ajuda { font-size: .84rem; color: var(--mut); margin: 0 0 14px; line-height: 1.5; }
     .resumo-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .chip { padding: 3px 10px; border-radius: 999px; font-size: .76rem; font-weight: 600; background: var(--soft); color: var(--ink2); }
@@ -681,6 +683,7 @@
           pronto para baixar com o peso da balança, cada um pelo login onde foi encontrado.
           Também aceita a planilha exportada em Consultar MTRs ou em Baixa s/ número.
         </p>
+        <p class="aviso-login" id="bn-login-falta" style="display:none"></p>
 
         <label class="upload-area" for="csv-massa-input" id="upload-label"
                ondragover="event.preventDefault();this.classList.add('drag-over')"
@@ -1295,6 +1298,7 @@
     _popularSelector();
     _atualizaBtnConfig();
     _atualizaConsultaInputs();
+    bnAtualizaLogin();
   }
 
   function excluirPerfil() {
@@ -1310,6 +1314,7 @@
     _popularSelector();
     _atualizaBtnConfig();
     _atualizaConsultaInputs();
+    bnAtualizaLogin();
   }
 
   window.addEventListener('DOMContentLoaded', _initSistema);
@@ -2127,6 +2132,8 @@
     wrap.style.display = 'none';
 
     const ondeProcurou = logins.map(a => a.nome).join(', ');
+    const semAcesso = bnSemAcesso().join(', ');
+    let naoAchados = 0;
     _csvRows = [];
     for (const l of linhas) {
       if (l.erro) { _csvRows.push(bnBloqueada(l, l.erro)); continue; }
@@ -2134,7 +2141,9 @@
       if (!achado) {
         _csvRows.push(bnBloqueada(l, semResposta.has(l.num)
           ? `${semResposta.get(l.num)} não respondeu: suba a planilha de novo`
+          : semAcesso ? `Não encontrado em ${ondeProcurou}. Falta configurar: ${semAcesso}`
           : `Não encontrado em nenhum login (${ondeProcurou})`));
+        if (!semResposta.has(l.num)) naoAchados++;
         continue;
       }
       const novas = bnLinhasDoMtr(l, achado.m, achado.a.dialect);
@@ -2143,10 +2152,13 @@
     }
     _bnModo = true;
     _renderCSVPreview();
-    if (falhas.length) {
-      showResponse('resp-massa', '❌ Login que não consultou: ' + falhas.join(' · ')
-        + '. Os MTRs dele aparecem como não encontrados.', true);
+    const avisos = [];
+    if (falhas.length) avisos.push('Login que não consultou: ' + falhas.join(' · ') + '. Os MTRs dele aparecem como não encontrados.');
+    if (naoAchados && semAcesso) {
+      avisos.push(`${naoAchados} MTR(s) não encontrado(s). Só procurei em: ${ondeProcurou}. `
+        + `Sem acesso configurado neste navegador: ${semAcesso}. ${BN_COMO_CONFIGURAR} Depois suba a planilha de novo.`);
     }
+    if (avisos.length) showResponse('resp-massa', '❌ ' + avisos.join('\n'), true);
 
     // nomes de gerador e transportador chegam depois, sem redesenhar a tabela
     // (redesenhar apagaria o que o operador já tiver corrigido nas células)
@@ -2163,9 +2175,23 @@
     });
   }
 
+  // Nomes dos logins cadastrados que ainda não têm credenciais completas.
+  // As credenciais ficam salvas em cada navegador: quem abre em outro computador
+  // começa sem elas, e a busca só passa pelos logins preenchidos ali.
+  function bnSemAcesso() {
+    return getPerfis().filter(p => !concAuthDe(p.id).ok).map(p => p.nome);
+  }
+  const BN_COMO_CONFIGURAR = 'Para incluir, escolha o sistema no menu da esquerda e clique em Configurar acesso.';
   function bnAtualizaLogin() {
     const el = document.getElementById('bn-login-nome');
     if (el) el.textContent = bnLogins().map(a => a.nome).join(', ') || 'nenhum ainda';
+    const falta = document.getElementById('bn-login-falta');
+    if (!falta) return;
+    const sem = bnSemAcesso();
+    falta.style.display = sem.length ? '' : 'none';
+    falta.textContent = sem.length
+      ? `Sem acesso configurado neste navegador: ${sem.join(', ')}. MTR desses sistemas não será encontrado. ${BN_COMO_CONFIGURAR}`
+      : '';
   }
   function bnPassos(n) {
     document.querySelectorAll('#bn-passos .passo').forEach(el =>
